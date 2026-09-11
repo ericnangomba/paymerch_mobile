@@ -54,8 +54,8 @@ const DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: 'pm-1',
     kind: 'MERCHANT_PAY',
-    title: 'Mahlangu Transport',
-    subtitle: 'Today, 08:42',
+    title: 'Mini bus fare',
+    subtitle: 'Passenger fare · Today, 08:42',
     amount: 25,
     status: 'SUCCESS',
     createdAt: Date.now() - 1000 * 60 * 48,
@@ -74,8 +74,8 @@ const DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: 'pm-3',
     kind: 'MERCHANT_PAY',
-    title: 'Lebo M.',
-    subtitle: 'Yesterday, 13:05',
+    title: 'Mini bus fare',
+    subtitle: 'Passenger fare · Yesterday, 13:05',
     amount: 80,
     status: 'SUCCESS',
     createdAt: Date.now() - 1000 * 60 * 60 * 20,
@@ -205,8 +205,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const transaction: Transaction = {
         id: makeId(),
         kind: 'MERCHANT_PAY',
-        title: source === 'QR' ? 'Paymerch merchant' : 'Demo merchant',
-        subtitle: online ? 'Just now' : 'Saved offline',
+        title: source === 'QR' ? 'Mini bus fare' : 'Demo mini bus fare',
+        subtitle: online ? 'Passenger fare · Just now' : 'Passenger fare · Saved offline',
         amount: safeAmount,
         status: online ? 'SUCCESS' : 'PENDING SYNC',
         createdAt: Date.now(),

@@ -110,7 +110,7 @@ function AuthScreen() {
         <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>WELCOME BACK</Text>
         <Text style={[styles.authTitle, { color: colors.foreground }]}>Enter your PIN</Text>
         <Text style={[styles.authSubtitle, { color: colors.mutedForeground }]}>
-          Unlock your merchant wallet to continue.
+          Unlock your driver wallet to continue.
         </Text>
         <View style={styles.pinDots}>
           {[0, 1, 2, 3, 4, 5].map((index) => (
@@ -187,7 +187,7 @@ function BalanceCard({ balance, online, onToggle }: { balance: number; online: b
   return (
     <View style={[styles.balanceCard, { backgroundColor: colors.dark }]}>
       <View style={styles.balanceTop}>
-        <Text style={styles.balanceLabel}>MERCHANT WALLET</Text>
+        <Text style={styles.balanceLabel}>MINI BUS WALLET</Text>
         <HapticPressable onPress={onToggle} style={styles.balanceVisibility}>
           <Feather name={hidden ? 'eye-off' : 'eye'} size={17} color="#B8B8B8" />
         </HapticPressable>
@@ -265,13 +265,13 @@ function HomeScreen({
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: 124 }]}
     >
-      <Header title="Lungile Fresh Produce" subtitle="Merchant account" online={online} onSettings={() => onNavigate('settings')} />
+      <Header title="Mahlangu Mini Bus" subtitle="Taxi driver account" online={online} onSettings={() => onNavigate('settings')} />
       <BalanceCard balance={merchantBalance} online={online} onToggle={toggleOnline} />
       <HapticPressable onPress={() => onNavigate('scan')} style={[styles.scanCta, { backgroundColor: colors.foreground }]}>
         <View>
-          <Text style={styles.scanCtaEyebrow}>COLLECT A PAYMENT</Text>
-          <Text style={styles.scanCtaTitle}>Scan Dynamic QR</Text>
-          <Text style={styles.scanCtaText}>Buyer sets the amount. You scan once.</Text>
+          <Text style={styles.scanCtaEyebrow}>DRIVER GETS PAID</Text>
+          <Text style={styles.scanCtaTitle}>Scan passenger fare</Text>
+          <Text style={styles.scanCtaText}>Passenger shows a one-time QR. You scan once.</Text>
         </View>
         <View style={styles.scanCtaIcon}>
           <Feather name="maximize" size={25} color={colors.foreground} />
@@ -283,6 +283,7 @@ function HomeScreen({
       </View>
       <View style={styles.actionGrid}>
         <QuickAction icon="zap" label="Sell VAS" onPress={() => onNavigate('vas')} />
+        <QuickAction icon="credit-card" label="Passenger pays" onPress={() => onNavigate('pay')} />
         <QuickAction icon="download" label="Cash out" onPress={onOpenCashOut} />
       </View>
       <View style={styles.sectionHeader}>
@@ -389,14 +390,14 @@ function PayScreen({ onBack }: { onBack: () => void }) {
           <Feather name="arrow-left" size={21} color={colors.foreground} />
         </HapticPressable>
         <View>
-          <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>BUYER MODE</Text>
-          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Pay with QR</Text>
+          <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>PASSENGER MODE</Text>
+          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Pay mini bus fare</Text>
         </View>
         <View style={{ width: 42 }} />
       </View>
       <View style={[styles.payBalance, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View>
-          <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>AVAILABLE TO PAY</Text>
+          <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>PASSENGER BALANCE</Text>
           <Text style={[styles.payBalanceAmount, { color: colors.foreground }]}>{zar(buyerBalance)}</Text>
         </View>
         <View style={[styles.payBalanceIcon, { backgroundColor: colors.accent }]}>
@@ -404,7 +405,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         </View>
       </View>
       <View style={styles.amountHeader}>
-        <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>ENTER AMOUNT</Text>
+        <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>ENTER FARE AMOUNT</Text>
         <Text style={[styles.amountDisplay, { color: number > buyerBalance ? colors.destructive : colors.foreground }]}>
           {amount ? `R${amount}` : 'R0.00'}
         </Text>
@@ -425,14 +426,14 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         style={[styles.primaryButton, { backgroundColor: colors.foreground }]}
       >
         <Feather name="maximize" size={18} color={colors.primaryForeground} />
-        <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Generate payment QR</Text>
+        <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Show fare QR to driver</Text>
       </HapticPressable>
       <Modal visible={qrVisible} transparent animationType="fade" onRequestClose={() => setQrVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.qrModal, { backgroundColor: colors.card }]}>
             <View style={styles.qrModalHeader}>
               <View>
-                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>PAYMENT REQUEST</Text>
+                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>MINI BUS FARE</Text>
                 <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>{zar(paymentRequest?.amount ?? number)}</Text>
               </View>
               <HapticPressable onPress={() => setQrVisible(false)} style={styles.closeButton}>
@@ -444,7 +445,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
               <Feather name="clock" size={15} color={colors.warning} />
               <Text style={[styles.timerText, { color: colors.warning }]}>{seconds}s remaining</Text>
             </View>
-            <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>Show this code to the merchant. It can only be used once.</Text>
+            <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>Show this code to the taxi driver. It can only be used once.</Text>
             <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{paymentRequest?.token ?? 'tok_demo_pm'}</Text>
           </View>
         </View>
@@ -473,9 +474,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <View style={[styles.successMark, { backgroundColor: result === 'success' ? colors.accent : colors.warm }]}>
           <Feather name={result === 'success' ? 'check' : 'clock'} size={34} color={result === 'success' ? colors.success : colors.warning} />
         </View>
-        <Text style={[styles.successTitle, { color: colors.foreground }]}>{result === 'success' ? 'Payment received' : 'Saved for sync'}</Text>
+          <Text style={[styles.successTitle, { color: colors.foreground }]}>{result === 'success' ? 'Mini bus fare received' : 'Fare saved for sync'}</Text>
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
-          {result === 'success' ? 'The buyer and merchant ledgers are updated.' : 'This payment is encrypted on-device and will sync when you reconnect.'}
+          {result === 'success' ? 'The passenger balance and driver wallet are updated.' : 'This fare is encrypted on-device and will sync when you reconnect.'}
         </Text>
         <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, { backgroundColor: colors.foreground }]}>
           <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Back to dashboard</Text>
@@ -494,8 +495,8 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           <Feather name="arrow-left" size={21} color="#FFFFFF" />
         </HapticPressable>
         <View>
-          <Text style={styles.scannerEyebrow}>MERCHANT MODE</Text>
-          <Text style={styles.scannerTitle}>Scan Dynamic QR</Text>
+          <Text style={styles.scannerEyebrow}>DRIVER MODE</Text>
+          <Text style={styles.scannerTitle}>Scan passenger fare</Text>
         </View>
         <StatusPill online={online} colors={colors} />
       </View>
@@ -510,14 +511,14 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         </View>
       </View>
       <View style={styles.scannerCopy}>
-        <Text style={styles.scannerHint}>{hasRequest ? 'Payment request detected' : 'Point your camera at the buyer’s code'}</Text>
+        <Text style={styles.scannerHint}>{hasRequest ? 'Passenger fare detected' : 'Point your camera at the passenger’s QR'}</Text>
         <Text style={styles.scannerSubhint}>
-          {hasRequest ? `${zar(paymentRequest?.amount ?? 35)} · Expires in 60 seconds` : 'The buyer QR is single-use and signed.'}
+          {hasRequest ? `${zar(paymentRequest?.amount ?? 35)} · Expires in 60 seconds` : 'The passenger QR is single-use and signed.'}
         </Text>
       </View>
       <HapticPressable onPress={scan} style={[styles.scanDemoButton, { backgroundColor: colors.card }]}>
         <Feather name="camera" size={18} color={colors.foreground} />
-        <Text style={[styles.scanDemoText, { color: colors.foreground }]}>{hasRequest ? 'Process scanned QR' : 'Use demo payment · R35'}</Text>
+        <Text style={[styles.scanDemoText, { color: colors.foreground }]}>{hasRequest ? 'Collect fare from passenger' : 'Use demo fare · R35'}</Text>
       </HapticPressable>
       <Text style={styles.scannerFootnote}>Camera access is simulated in this prototype</Text>
     </View>
@@ -689,7 +690,7 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
       <View style={[styles.settingsProfile, { backgroundColor: colors.dark }]}>
         <View style={styles.profileInitials}><Text style={styles.profileInitialText}>LF</Text></View>
         <View>
-          <Text style={styles.settingsName}>Lungile Fresh Produce</Text>
+          <Text style={styles.settingsName}>Mahlangu Mini Bus</Text>
           <Text style={styles.settingsPhone}>+27 72 555 0198</Text>
         </View>
       </View>
@@ -796,7 +797,7 @@ export default function PaymerchHome() {
           <View style={[styles.cashOutModal, { backgroundColor: colors.card }]}>
             <View style={styles.qrModalHeader}>
               <View>
-                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>MERCHANT WALLET · {zar(merchantBalance)}</Text>
+                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>MINI BUS WALLET · {zar(merchantBalance)}</Text>
                 <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>Cash out</Text>
               </View>
               <HapticPressable onPress={() => setCashOutVisible(false)} style={styles.closeButton}><Feather name="x" size={20} color={colors.foreground} /></HapticPressable>
@@ -871,7 +872,7 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: 'Inter_700Bold', fontSize: 16 },
   sectionHint: { fontFamily: 'Inter_400Regular', fontSize: 12 },
   sectionLink: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  actionGrid: { flexDirection: 'row', gap: 10 },
+  actionGrid: { flexDirection: 'row', gap: 8 },
   quickAction: { flex: 1, minHeight: 82, borderRadius: 18, borderWidth: 1, padding: 12, justifyContent: 'space-between' },
   quickIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   quickLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
