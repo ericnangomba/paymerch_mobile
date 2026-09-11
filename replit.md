@@ -1,6 +1,6 @@
 # Paymerch Mobile
 
-Paymerch Mobile is a local-first digital wallet prototype for mini-bus taxi drivers and passengers, with PIN access, dynamic QR fare payments, VAS vending, and offline sync states.
+Paymerch Mobile is a local-first digital wallet prototype for unbanked informal businesses, with PIN access, customer QR payments, VAS vending, and offline sync states.
 
 ## Run & Operate
 
@@ -31,13 +31,13 @@ Paymerch Mobile is a local-first digital wallet prototype for mini-bus taxi driv
 ## Architecture decisions
 
 - The first build is Expo/frontend-only and uses AsyncStorage so the entire demo works without external accounts or provider credentials.
-- The fare flow uses passenger-generated dynamic QR requests and a taxi-driver scan simulation, with a local double-entry-style balance shift.
+- The payment flow uses customer-generated dynamic QR requests and seller scan simulation, with a local double-entry-style balance shift. Mini-bus fares are supported as one business category alongside other informal businesses.
 - Offline mode marks new payment and VAS activity as `PENDING SYNC`; reconnecting can promote pending activity to `SUCCESS`.
 - The generated QR is a deterministic visual mock for the signed token flow; production should replace it with a server-signed QR payload and native camera scanning.
 
 ## Product
 
-Paymerch Mobile lets a taxi driver unlock a mini-bus wallet, collect fares by scanning a passenger's one-time QR, sell airtime or electricity tokens, cash out, review activity, and simulate offline transaction caching. A passenger pay mode generates a 60-second fare QR.
+Paymerch Mobile lets an informal trader unlock a business wallet, collect payments by scanning a customer's one-time QR, sell airtime or electricity tokens, cash out, review activity, and simulate offline transaction caching. Supported business types include spaza shops, street vendors, carwashes, tshisa nyama, street food stalls, tomatoes and veggies sellers, and mini-bus taxis.
 
 ## User preferences
 

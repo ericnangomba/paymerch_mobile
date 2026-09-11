@@ -14,10 +14,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { Transaction, useWallet } from '@/state/paymerch-context';
+import { BusinessCategory, Transaction, useWallet } from '@/state/paymerch-context';
 
 type Screen = 'home' | 'pay' | 'scan' | 'vas' | 'activity' | 'settings';
 type IconName = React.ComponentProps<typeof Feather>['name'];
+const businessCategories: BusinessCategory[] = [
+  'Spaza shop',
+  'Street vendor',
+  'Carwash',
+  'Tshisa nyama',
+  'Street food stall',
+  'Tomatoes & veggies',
+  'Mini bus taxi',
+];
 
 const logo = require('../assets/images/paymerch-icon.png');
 
@@ -110,7 +119,7 @@ function AuthScreen() {
         <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>WELCOME BACK</Text>
         <Text style={[styles.authTitle, { color: colors.foreground }]}>Enter your PIN</Text>
         <Text style={[styles.authSubtitle, { color: colors.mutedForeground }]}>
-          Unlock your driver wallet to continue.
+          Unlock your wallet to continue.
         </Text>
         <View style={styles.pinDots}>
           {[0, 1, 2, 3, 4, 5].map((index) => (
@@ -187,7 +196,7 @@ function BalanceCard({ balance, online, onToggle }: { balance: number; online: b
   return (
     <View style={[styles.balanceCard, { backgroundColor: colors.dark }]}>
       <View style={styles.balanceTop}>
-        <Text style={styles.balanceLabel}>MINI BUS WALLET</Text>
+        <Text style={styles.balanceLabel}>BUSINESS WALLET</Text>
         <HapticPressable onPress={onToggle} style={styles.balanceVisibility}>
           <Feather name={hidden ? 'eye-off' : 'eye'} size={17} color="#B8B8B8" />
         </HapticPressable>
@@ -259,19 +268,19 @@ function HomeScreen({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { merchantBalance, online, toggleOnline, transactions } = useWallet();
+  const { merchantBalance, online, toggleOnline, transactions, businessCategory } = useWallet();
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: 124 }]}
     >
-      <Header title="Mahlangu Mini Bus" subtitle="Taxi driver account" online={online} onSettings={() => onNavigate('settings')} />
+      <Header title={`Lungile's ${businessCategory}`} subtitle="Informal business account" online={online} onSettings={() => onNavigate('settings')} />
       <BalanceCard balance={merchantBalance} online={online} onToggle={toggleOnline} />
       <HapticPressable onPress={() => onNavigate('scan')} style={[styles.scanCta, { backgroundColor: colors.foreground }]}>
         <View>
-          <Text style={styles.scanCtaEyebrow}>DRIVER GETS PAID</Text>
-          <Text style={styles.scanCtaTitle}>Scan passenger fare</Text>
-          <Text style={styles.scanCtaText}>Passenger shows a one-time QR. You scan once.</Text>
+          <Text style={styles.scanCtaEyebrow}>GET PAID</Text>
+          <Text style={styles.scanCtaTitle}>Scan customer QR</Text>
+          <Text style={styles.scanCtaText}>Your customer shows a one-time QR. You scan once.</Text>
         </View>
         <View style={styles.scanCtaIcon}>
           <Feather name="maximize" size={25} color={colors.foreground} />
@@ -283,7 +292,7 @@ function HomeScreen({
       </View>
       <View style={styles.actionGrid}>
         <QuickAction icon="zap" label="Sell VAS" onPress={() => onNavigate('vas')} />
-        <QuickAction icon="credit-card" label="Passenger pays" onPress={() => onNavigate('pay')} />
+        <QuickAction icon="credit-card" label="Customer pays" onPress={() => onNavigate('pay')} />
         <QuickAction icon="download" label="Cash out" onPress={onOpenCashOut} />
       </View>
       <View style={styles.sectionHeader}>
@@ -390,14 +399,14 @@ function PayScreen({ onBack }: { onBack: () => void }) {
           <Feather name="arrow-left" size={21} color={colors.foreground} />
         </HapticPressable>
         <View>
-          <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>PASSENGER MODE</Text>
-          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Pay mini bus fare</Text>
+          <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>CUSTOMER MODE</Text>
+          <Text style={[styles.pageTitle, { color: colors.foreground }]}>Pay with QR</Text>
         </View>
         <View style={{ width: 42 }} />
       </View>
       <View style={[styles.payBalance, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View>
-          <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>PASSENGER BALANCE</Text>
+          <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>CUSTOMER BALANCE</Text>
           <Text style={[styles.payBalanceAmount, { color: colors.foreground }]}>{zar(buyerBalance)}</Text>
         </View>
         <View style={[styles.payBalanceIcon, { backgroundColor: colors.accent }]}>
@@ -405,7 +414,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         </View>
       </View>
       <View style={styles.amountHeader}>
-        <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>ENTER FARE AMOUNT</Text>
+        <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>ENTER AMOUNT</Text>
         <Text style={[styles.amountDisplay, { color: number > buyerBalance ? colors.destructive : colors.foreground }]}>
           {amount ? `R${amount}` : 'R0.00'}
         </Text>
@@ -426,14 +435,14 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         style={[styles.primaryButton, { backgroundColor: colors.foreground }]}
       >
         <Feather name="maximize" size={18} color={colors.primaryForeground} />
-        <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Show fare QR to driver</Text>
+        <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Show QR to seller</Text>
       </HapticPressable>
       <Modal visible={qrVisible} transparent animationType="fade" onRequestClose={() => setQrVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.qrModal, { backgroundColor: colors.card }]}>
             <View style={styles.qrModalHeader}>
               <View>
-                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>MINI BUS FARE</Text>
+                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>PAYMENT REQUEST</Text>
                 <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>{zar(paymentRequest?.amount ?? number)}</Text>
               </View>
               <HapticPressable onPress={() => setQrVisible(false)} style={styles.closeButton}>
@@ -445,7 +454,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
               <Feather name="clock" size={15} color={colors.warning} />
               <Text style={[styles.timerText, { color: colors.warning }]}>{seconds}s remaining</Text>
             </View>
-            <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>Show this code to the taxi driver. It can only be used once.</Text>
+            <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>Show this code to the seller. It can only be used once.</Text>
             <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{paymentRequest?.token ?? 'tok_demo_pm'}</Text>
           </View>
         </View>
@@ -474,9 +483,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <View style={[styles.successMark, { backgroundColor: result === 'success' ? colors.accent : colors.warm }]}>
           <Feather name={result === 'success' ? 'check' : 'clock'} size={34} color={result === 'success' ? colors.success : colors.warning} />
         </View>
-          <Text style={[styles.successTitle, { color: colors.foreground }]}>{result === 'success' ? 'Mini bus fare received' : 'Fare saved for sync'}</Text>
+          <Text style={[styles.successTitle, { color: colors.foreground }]}>{result === 'success' ? 'Payment received' : 'Payment saved for sync'}</Text>
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
-          {result === 'success' ? 'The passenger balance and driver wallet are updated.' : 'This fare is encrypted on-device and will sync when you reconnect.'}
+          {result === 'success' ? 'The customer and business wallets are updated.' : 'This payment is encrypted on-device and will sync when you reconnect.'}
         </Text>
         <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, { backgroundColor: colors.foreground }]}>
           <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Back to dashboard</Text>
@@ -495,8 +504,8 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           <Feather name="arrow-left" size={21} color="#FFFFFF" />
         </HapticPressable>
         <View>
-          <Text style={styles.scannerEyebrow}>DRIVER MODE</Text>
-          <Text style={styles.scannerTitle}>Scan passenger fare</Text>
+          <Text style={styles.scannerEyebrow}>SELLER MODE</Text>
+          <Text style={styles.scannerTitle}>Scan customer payment</Text>
         </View>
         <StatusPill online={online} colors={colors} />
       </View>
@@ -511,14 +520,14 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         </View>
       </View>
       <View style={styles.scannerCopy}>
-        <Text style={styles.scannerHint}>{hasRequest ? 'Passenger fare detected' : 'Point your camera at the passenger’s QR'}</Text>
+        <Text style={styles.scannerHint}>{hasRequest ? 'Customer payment detected' : 'Point your camera at the customer’s QR'}</Text>
         <Text style={styles.scannerSubhint}>
-          {hasRequest ? `${zar(paymentRequest?.amount ?? 35)} · Expires in 60 seconds` : 'The passenger QR is single-use and signed.'}
+          {hasRequest ? `${zar(paymentRequest?.amount ?? 35)} · Expires in 60 seconds` : 'The customer QR is single-use and signed.'}
         </Text>
       </View>
       <HapticPressable onPress={scan} style={[styles.scanDemoButton, { backgroundColor: colors.card }]}>
         <Feather name="camera" size={18} color={colors.foreground} />
-        <Text style={[styles.scanDemoText, { color: colors.foreground }]}>{hasRequest ? 'Collect fare from passenger' : 'Use demo fare · R35'}</Text>
+        <Text style={[styles.scanDemoText, { color: colors.foreground }]}>{hasRequest ? 'Collect customer payment' : 'Use demo payment · R35'}</Text>
       </HapticPressable>
       <Text style={styles.scannerFootnote}>Camera access is simulated in this prototype</Text>
     </View>
@@ -673,7 +682,7 @@ function ActivityScreen({ onBack }: { onBack: () => void }) {
 function SettingsScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { online, toggleOnline, syncPending, transactions, logout } = useWallet();
+  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory } = useWallet();
   const pending = transactions.filter((transaction) => transaction.status === 'PENDING SYNC').length;
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 30 }]}>
@@ -690,8 +699,26 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
       <View style={[styles.settingsProfile, { backgroundColor: colors.dark }]}>
         <View style={styles.profileInitials}><Text style={styles.profileInitialText}>LF</Text></View>
         <View>
-          <Text style={styles.settingsName}>Mahlangu Mini Bus</Text>
+          <Text style={styles.settingsName}>Lungile's Market</Text>
           <Text style={styles.settingsPhone}>+27 72 555 0198</Text>
+        </View>
+      </View>
+      <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>BUSINESS TYPE</Text>
+      <View style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Text style={[styles.categoryIntro, { color: colors.mutedForeground }]}>Choose the business you run. Paymerch works for everyday informal trade.</Text>
+        <View style={styles.categoryGrid}>
+          {businessCategories.map((category) => {
+            const selected = businessCategory === category;
+            return (
+              <HapticPressable
+                key={category}
+                onPress={() => setBusinessCategory(category)}
+                style={[styles.categoryChip, { backgroundColor: selected ? colors.foreground : colors.muted, borderColor: selected ? colors.foreground : colors.border }]}
+              >
+                <Text style={[styles.categoryChipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{category}</Text>
+              </HapticPressable>
+            );
+          })}
         </View>
       </View>
       <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>CONNECTION</Text>
@@ -797,7 +824,7 @@ export default function PaymerchHome() {
           <View style={[styles.cashOutModal, { backgroundColor: colors.card }]}>
             <View style={styles.qrModalHeader}>
               <View>
-                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>MINI BUS WALLET · {zar(merchantBalance)}</Text>
+                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>BUSINESS WALLET · {zar(merchantBalance)}</Text>
                 <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>Cash out</Text>
               </View>
               <HapticPressable onPress={() => setCashOutVisible(false)} style={styles.closeButton}><Feather name="x" size={20} color={colors.foreground} /></HapticPressable>
@@ -977,6 +1004,11 @@ const styles = StyleSheet.create({
   profileInitialText: { fontFamily: 'Inter_700Bold', color: '#0A0A0A', fontSize: 16 },
   settingsName: { fontFamily: 'Inter_700Bold', color: '#FFFFFF', fontSize: 15 },
   settingsPhone: { fontFamily: 'Inter_400Regular', color: '#A7A7A7', fontSize: 12, marginTop: 5 },
+  categoryCard: { borderWidth: 1, borderRadius: 20, padding: 14, marginBottom: 23 },
+  categoryIntro: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, marginBottom: 12 },
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  categoryChip: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9 },
+  categoryChipText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
   settingsCard: { borderWidth: 1, borderRadius: 20, padding: 14, marginBottom: 23 },
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   settingIcon: { width: 37, height: 37, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

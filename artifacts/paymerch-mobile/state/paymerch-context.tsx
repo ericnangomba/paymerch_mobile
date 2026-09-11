@@ -3,6 +3,14 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 export type TransactionStatus = 'SUCCESS' | 'PENDING SYNC' | 'FAILED';
 export type TransactionKind = 'MERCHANT_PAY' | 'VAS_ELEC' | 'VAS_AIRTIME' | 'CASH_OUT';
+export type BusinessCategory =
+  | 'Spaza shop'
+  | 'Street vendor'
+  | 'Carwash'
+  | 'Tshisa nyama'
+  | 'Street food stall'
+  | 'Tomatoes & veggies'
+  | 'Mini bus taxi';
 
 export type Transaction = {
   id: string;
@@ -27,6 +35,7 @@ type PersistedWallet = {
   transactions: Transaction[];
   online: boolean;
   paymentRequest: PaymentRequest | null;
+  businessCategory?: BusinessCategory;
 };
 
 type WalletContextValue = {
@@ -37,6 +46,7 @@ type WalletContextValue = {
   transactions: Transaction[];
   online: boolean;
   paymentRequest: PaymentRequest | null;
+  businessCategory: BusinessCategory;
   login: (pin: string) => Promise<boolean>;
   biometricLogin: () => Promise<void>;
   logout: () => Promise<void>;
@@ -46,6 +56,7 @@ type WalletContextValue = {
   completePayment: (amount: number, source?: 'QR' | 'DEMO') => void;
   vendVas: (kind: 'VAS_ELEC' | 'VAS_AIRTIME', amount: number, destination: string) => string | null;
   cashOut: (amount: number) => boolean;
+  setBusinessCategory: (category: BusinessCategory) => void;
 };
 
 const STORAGE_KEY = 'paymerch-wallet-v1';
@@ -54,8 +65,8 @@ const DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: 'pm-1',
     kind: 'MERCHANT_PAY',
-    title: 'Mini bus fare',
-    subtitle: 'Passenger fare · Today, 08:42',
+    title: 'Customer payment',
+    subtitle: 'QR payment · Today, 08:42',
     amount: 25,
     status: 'SUCCESS',
     createdAt: Date.now() - 1000 * 60 * 48,
@@ -74,8 +85,8 @@ const DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: 'pm-3',
     kind: 'MERCHANT_PAY',
-    title: 'Mini bus fare',
-    subtitle: 'Passenger fare · Yesterday, 13:05',
+    title: 'Customer payment',
+    subtitle: 'QR payment · Yesterday, 13:05',
     amount: 80,
     status: 'SUCCESS',
     createdAt: Date.now() - 1000 * 60 * 60 * 20,
@@ -115,6 +126,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>(DEMO_TRANSACTIONS);
   const [online, setOnline] = useState(true);
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [businessCategory, setBusinessCategory] = useState<BusinessCategory>('Spaza shop');
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +144,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           setTransactions(wallet.transactions);
           setOnline(wallet.online);
           setPaymentRequest(wallet.paymentRequest);
+          setBusinessCategory(wallet.businessCategory ?? 'Spaza shop');
         } catch {
           await AsyncStorage.removeItem(STORAGE_KEY);
         }
@@ -153,9 +166,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       transactions,
       online,
       paymentRequest,
+      businessCategory,
     };
     void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(wallet));
-  }, [buyerBalance, merchantBalance, transactions, online, paymentRequest, ready]);
+  }, [buyerBalance, merchantBalance, transactions, online, paymentRequest, businessCategory, ready]);
 
   const login = useCallback(async (pin: string) => {
     const valid = pin === '123456';
@@ -205,8 +219,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const transaction: Transaction = {
         id: makeId(),
         kind: 'MERCHANT_PAY',
-        title: source === 'QR' ? 'Mini bus fare' : 'Demo mini bus fare',
-        subtitle: online ? 'Passenger fare · Just now' : 'Passenger fare · Saved offline',
+        title: source === 'QR' ? 'Customer payment' : 'Demo customer payment',
+        subtitle: online ? 'QR payment · Just now' : 'QR payment · Saved offline',
         amount: safeAmount,
         status: online ? 'SUCCESS' : 'PENDING SYNC',
         createdAt: Date.now(),
@@ -265,6 +279,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [merchantBalance, online],
   );
 
+  const updateBusinessCategory = useCallback((category: BusinessCategory) => {
+    setBusinessCategory(category);
+  }, []);
+
   const value = useMemo(
     () => ({
       ready,
@@ -274,6 +292,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       transactions,
       online,
       paymentRequest,
+      businessCategory,
       login,
       biometricLogin,
       logout,
@@ -283,6 +302,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       completePayment,
       vendVas,
       cashOut,
+      setBusinessCategory: updateBusinessCategory,
     }),
     [
       ready,
@@ -292,6 +312,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       transactions,
       online,
       paymentRequest,
+      businessCategory,
       login,
       biometricLogin,
       logout,
@@ -301,6 +322,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       completePayment,
       vendVas,
       cashOut,
+      updateBusinessCategory,
     ],
   );
 
