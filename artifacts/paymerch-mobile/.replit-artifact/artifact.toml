@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/paymerch-mobile/"
+title = "Paymerch Mobile"
+description = "A mobile wallet prototype for informal merchants and buyers, with PIN access, dynamic QR payments, offline pending transactions, VAS vending, and a simulated double-entry ledger."
+version = "1.0.0"
+id = "artifacts/paymerch-mobile"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/paymerch-mobile/" ]
+localPort = 22317
+
+[services.development]
+run = "pnpm --filter @workspace/paymerch-mobile run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/paymerch-mobile", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/paymerch-mobile", "run", "serve" ]
+
+[services.env]
+PORT = "22317"
+BASE_PATH = "/paymerch-mobile/"

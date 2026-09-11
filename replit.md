@@ -1,6 +1,6 @@
-# [Project name]
+# Paymerch Mobile
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Paymerch Mobile is a local-first digital wallet prototype for informal merchants, with PIN access, dynamic QR payments, VAS vending, and offline sync states.
 
 ## Run & Operate
 
@@ -22,23 +22,32 @@ _Replace the heading above with the project's name, and this line with one sente
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/paymerch-mobile/app/index.tsx` — the mobile experience and all primary prototype screens.
+- `artifacts/paymerch-mobile/state/paymerch-context.tsx` — persisted demo wallet state, ledger actions, QR requests, and offline sync behavior.
+- `artifacts/paymerch-mobile/constants/colors.ts` — Paymerch light and dark semantic theme tokens.
+- `artifacts/paymerch-mobile/assets/images/paymerch-icon.png` — supplied Paymerch shield mark used by the app.
+- `artifacts/api-server` — shared API scaffold, intentionally not required for the first local-first prototype.
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The first build is Expo/frontend-only and uses AsyncStorage so the entire demo works without external accounts or provider credentials.
+- The payment flow uses buyer-generated dynamic QR requests and a merchant scan simulation, with a local double-entry-style balance shift.
+- Offline mode marks new payment and VAS activity as `PENDING SYNC`; reconnecting can promote pending activity to `SUCCESS`.
+- The generated QR is a deterministic visual mock for the signed token flow; production should replace it with a server-signed QR payload and native camera scanning.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+Paymerch Mobile lets a merchant unlock a wallet, view a balance, receive payments by scanning a buyer's one-time QR, sell airtime or electricity tokens, cash out, review activity, and simulate offline transaction caching. A buyer pay mode is included for generating a 60-second payment QR.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+No additional preferences recorded.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- The demo PIN is `0426`.
+- The first build intentionally keeps balances local; do not treat it as a production ledger or real payment rail.
+- Expo's local React Native DevTools binary may report a missing `libglib-2.0.so.0` warning in this environment while Metro continues to serve the app.
 
 ## Pointers
 
