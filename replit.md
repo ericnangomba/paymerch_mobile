@@ -45,7 +45,7 @@ No additional preferences recorded.
 
 ## Gotchas
 
-- The demo PIN is `0426`.
+- The demo PIN is `123456`.
 - The first build intentionally keeps balances local; do not treat it as a production ledger or real payment rail.
 - Expo's local React Native DevTools binary may report a missing `libglib-2.0.so.0` warning in this environment while Metro continues to serve the app.
 

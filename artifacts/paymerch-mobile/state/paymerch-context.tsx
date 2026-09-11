@@ -158,7 +158,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [buyerBalance, merchantBalance, transactions, online, paymentRequest, ready]);
 
   const login = useCallback(async (pin: string) => {
-    const valid = pin === '0426';
+    const valid = pin === '123456';
     if (valid) {
       setSignedIn(true);
       await AsyncStorage.setItem(SESSION_KEY, 'active');

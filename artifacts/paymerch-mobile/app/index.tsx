@@ -82,14 +82,14 @@ function AuthScreen() {
   const [error, setError] = useState('');
 
   const enterDigit = async (digit: string) => {
-    if (pin.length >= 4) return;
+    if (pin.length >= 6) return;
     const next = `${pin}${digit}`;
     setPin(next);
     setError('');
-    if (next.length === 4) {
+    if (next.length === 6) {
       const valid = await login(next);
       if (!valid) {
-        setError('That PIN did not match. Try the demo PIN 0426.');
+        setError('That PIN did not match. Try the demo PIN 123456.');
         setPin('');
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
@@ -113,7 +113,7 @@ function AuthScreen() {
           Unlock your merchant wallet to continue.
         </Text>
         <View style={styles.pinDots}>
-          {[0, 1, 2, 3].map((index) => (
+          {[0, 1, 2, 3, 4, 5].map((index) => (
             <View
               key={index}
               style={[styles.pinDot, { backgroundColor: index < pin.length ? colors.foreground : colors.border }]}
@@ -141,7 +141,7 @@ function AuthScreen() {
           <Feather name="smartphone" size={17} color={colors.foreground} />
           <Text style={[styles.biometricText, { color: colors.foreground }]}>Use device unlock</Text>
         </HapticPressable>
-        <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>Demo PIN 0426</Text>
+        <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>Demo PIN 123456</Text>
       </View>
       <Text style={[styles.secureFooter, { color: colors.mutedForeground }]}>
         <Feather name="shield" size={12} /> Your wallet is secured on this device
