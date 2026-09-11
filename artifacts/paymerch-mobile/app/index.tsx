@@ -103,7 +103,7 @@ function AuthScreen() {
     <View style={[styles.authRoot, { backgroundColor: colors.background }]}>
       <View style={styles.authTop}>
         <BrandMark size={58} />
-        <Text style={[styles.brandName, { color: colors.foreground }]}>PAYMERCH</Text>
+        <Text style={[styles.brandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
         <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Simply Secure Payments</Text>
       </View>
       <View style={styles.authBody}>
