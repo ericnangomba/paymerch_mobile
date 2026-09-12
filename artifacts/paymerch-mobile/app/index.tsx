@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import * as LocalAuthentication from 'expo-local-authentication';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Animated,
   Image,
   Modal,
   Platform,
@@ -15,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { AccountType, BusinessCategory, Transaction, UserProfile, useWallet } from '@/state/paymerch-context';
+import { AccountType, BusinessCategory, Transaction, UserProfile, PaymentRequest, useWallet } from '@/state/paymerch-context';
 
 type Screen = 'home' | 'pay' | 'scan' | 'vas' | 'activity' | 'settings';
 type IconName = React.ComponentProps<typeof Feather>['name'];
@@ -93,14 +94,105 @@ function StatusPill({ online, colors }: { online: boolean; colors: ReturnType<ty
   );
 }
 
+function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: externalError, onClearError }: { visible: boolean; onConfirm: (pin: string) => void; onCancel: () => void; title: string; error?: string; onClearError?: () => void }) {
+  const colors = useColors();
+  const [pin, setPin] = useState('');
+  const [error, setError] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+
+  // Use external error if provided
+  const displayError = externalError || error;
+
+  const handleDigit = (digit: string) => {
+    if (pin.length >= 6 || isProcessing) return;
+    const next = `${pin}${digit}`;
+    setPin(next);
+    setError('');
+    onClearError?.();
+    if (next.length === 6) {
+      setIsProcessing(true);
+      onConfirm(next);
+      // Parent component will handle success/failure and close modal
+      setTimeout(() => {
+        setIsProcessing(false);
+      }, 300);
+    }
+  };
+
+  const handleDelete = () => {
+    if (isProcessing) return;
+    setPin((value) => value.slice(0, -1));
+    setError('');
+  };
+  const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+  // Reset state when modal opens/closes
+  useEffect(() => {
+    if (!visible) {
+      setPin('');
+      setError('');
+      setIsProcessing(false);
+    }
+  }, [visible]);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+      <View style={styles.modalBackdrop}>
+        <View style={[styles.pinModal, { backgroundColor: colors.card }]}>
+          <View style={styles.pinModalHeader}>
+            <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>SECURITY CHECK</Text>
+            <Text style={[styles.pinModalTitle, { color: colors.foreground }]}>{title}</Text>
+            <HapticPressable onPress={onCancel} style={styles.closeButton}>
+              <Feather name="x" size={20} color={colors.foreground} />
+            </HapticPressable>
+          </View>
+          <Text style={[styles.authSubtitle, { color: colors.mutedForeground }, { textAlign: 'center', marginTop: 10 }]}>
+            Enter your PIN to confirm this transaction
+          </Text>
+          <View style={styles.pinDots}>
+            {[0, 1, 2, 3, 4, 5].map((index) => (
+              <View
+                key={index}
+                style={[styles.pinDot, { backgroundColor: index < pin.length ? colors.foreground : colors.border }]}
+              />
+            ))}
+          </View>
+          {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
+          <View style={styles.pinPad}>
+            {keys.map((key) => (
+              <HapticPressable key={key} onPress={() => void handleDigit(key)} style={styles.pinKey}>
+                <Text style={[styles.pinKeyText, { color: colors.foreground }]}>{key}</Text>
+              </HapticPressable>
+            ))}
+            <View style={styles.pinKey} />
+            <HapticPressable onPress={() => void handleDigit('0')} style={styles.pinKey}>
+              <Text style={[styles.pinKeyText, { color: colors.foreground }]}>0</Text>
+            </HapticPressable>
+            <HapticPressable onPress={handleDelete} style={styles.pinKey}>
+              <Feather name="delete" size={21} color={colors.foreground} />
+            </HapticPressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 function AuthScreen() {
   const colors = useColors();
-  const { login, biometricLogin } = useWallet();
+  const { login, biometricLogin, isRegistered } = useWallet();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [registrationMessage, setRegistrationMessage] = useState('');
   const [biometricLabel, setBiometricLabel] = useState('Use device unlock');
+
+  // If not registered, show registration screen by default
+  useEffect(() => {
+    if (!isRegistered) {
+      setMode('register');
+    }
+  }, [isRegistered]);
 
   useEffect(() => {
     let cancelled = false;
@@ -168,7 +260,7 @@ function AuthScreen() {
     if (next.length === 6) {
       const valid = await login(next);
       if (!valid) {
-        setError('That PIN did not match. Try the demo PIN 123456.');
+        setError('That PIN did not match. Please try again.');
         setPin('');
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
@@ -234,12 +326,7 @@ function AuthScreen() {
           <Feather name="smartphone" size={17} color={colors.foreground} />
           <Text style={[styles.biometricText, { color: colors.foreground }]}>{biometricLabel}</Text>
         </HapticPressable>
-        <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>Demo PIN 123456</Text>
-        <HapticPressable onPress={() => { setRegistrationMessage(''); setMode('register'); }} style={styles.registerLink}>
-          <Text style={[styles.registerLinkText, { color: colors.mutedForeground }]}>
-            New to Paymerch? <Text style={{ color: colors.foreground }}>Register</Text>
-          </Text>
-        </HapticPressable>
+        <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>Enter your 6-digit PIN to unlock</Text>
       </View>
       <Text style={[styles.secureFooter, { color: colors.mutedForeground }]}>
         <Feather name="shield" size={12} /> Your wallet is secured on this device
@@ -250,23 +337,99 @@ function AuthScreen() {
 
 function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
   const colors = useColors();
+  const logoOpacity = useMemo(() => new Animated.Value(0), []);
+  const logoScale = useMemo(() => new Animated.Value(0.8), []);
+  const textOpacity = useMemo(() => new Animated.Value(0), []);
+  const textTranslateY = useMemo(() => new Animated.Value(20), []);
+  const buttonOpacity = useMemo(() => new Animated.Value(0), []);
+  const buttonTranslateY = useMemo(() => new Animated.Value(30), []);
+  const buttonScale = useMemo(() => new Animated.Value(1), []);
+
+  useEffect(() => {
+    const animations = Animated.sequence([
+      Animated.parallel([
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.spring(logoScale, {
+          toValue: 1,
+          friction: 8,
+          tension: 40,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(textOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(textTranslateY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.parallel([
+        Animated.timing(buttonOpacity, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonTranslateY, {
+          toValue: 0,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]);
+
+    animations.start();
+
+    // Add a subtle pulse animation to the button
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(buttonScale, {
+          toValue: 1.05,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(buttonScale, {
+          toValue: 1,
+          duration: 1500,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulseAnimation.start();
+
+    return () => {
+      animations.stop();
+      pulseAnimation.stop();
+    };
+  }, []);
+
   return (
     <View style={[styles.splashRoot, { backgroundColor: colors.background }]}>
       <View style={styles.splashCenter}>
-        <BrandMark size={86} />
-        <Text style={[styles.splashBrandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
-        <Text style={[styles.splashTagline, { color: colors.mutedForeground }]}>Simply Secure Payments</Text>
+        <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
+          <BrandMark size={86} />
+        </Animated.View>
+        <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textTranslateY }] }}>
+          <Text style={[styles.splashBrandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
+          <Text style={[styles.splashTagline, { color: colors.mutedForeground }]}>Simply Secure Payments</Text>
+        </Animated.View>
       </View>
-      <View style={styles.splashFooter}>
-        <View style={[styles.splashProgressTrack, { backgroundColor: colors.border }]}>
-          <View style={[styles.splashProgress, { backgroundColor: colors.foreground }]} />
-        </View>
-        <Text style={[styles.splashFooterText, { color: colors.mutedForeground }]}>Your wallet, ready for everyday trade</Text>
-        <HapticPressable onPress={onContinue} style={[styles.splashAction, { backgroundColor: colors.foreground }]}>
-          <Text style={[styles.splashActionText, { color: colors.primaryForeground }]}>Get started</Text>
-          <Feather name="arrow-right" size={16} color={colors.primaryForeground} />
-        </HapticPressable>
-      </View>
+      <Animated.View style={{ opacity: buttonOpacity, transform: [{ translateY: buttonTranslateY }] }}>
+        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
+          <HapticPressable onPress={onContinue} style={[styles.splashAction, { backgroundColor: colors.accent }]}>
+            <Text style={[styles.splashActionText, { color: colors.accentForeground }]}>Get started</Text>
+            <Feather name="arrow-right" size={16} color={colors.accentForeground} />
+          </HapticPressable>
+        </Animated.View>
+      </Animated.View>
     </View>
   );
 }
@@ -324,10 +487,10 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
         <BrandMark size={42} />
         <View style={{ width: 42 }} />
       </View>
-      <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>GET STARTED</Text>
+      <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>FIRST TIME SETUP</Text>
       <Text style={[styles.registrationTitle, { color: colors.foreground }]}>Create your wallet</Text>
       <Text style={[styles.registrationSubtitle, { color: colors.mutedForeground }]}>
-        One account for your everyday payments, sales, and services.
+        Set up your account and PIN for secure transactions.
       </Text>
       <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 25 }]}>I AM REGISTERING AS</Text>
       <View style={[styles.segmented, { backgroundColor: colors.muted }]}>
@@ -644,10 +807,14 @@ function QRCode({ seed }: { seed: string }) {
 function PayScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buyerBalance, createPaymentRequest, paymentRequest } = useWallet();
+  const { buyerBalance, createPaymentRequest, paymentRequest, completePayment } = useWallet();
   const [amount, setAmount] = useState('');
   const [qrVisible, setQrVisible] = useState(false);
   const [seconds, setSeconds] = useState(60);
+  const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [pendingAmount, setPendingAmount] = useState(0);
+  const [localPaymentRequest, setLocalPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [pinError, setPinError] = useState('');
 
   useEffect(() => {
     if (!qrVisible) return;
@@ -662,9 +829,22 @@ function PayScreen({ onBack }: { onBack: () => void }) {
   const number = Number(amount);
   const generate = () => {
     if (number <= 0 || number > buyerBalance) return;
-    createPaymentRequest(number);
-    setSeconds(60);
-    setQrVisible(true);
+    setPendingAmount(number);
+    setPinModalVisible(true);
+  };
+
+  const handlePinConfirm = (pin: string) => {
+    const request = createPaymentRequest(pendingAmount, pin);
+    if (request !== null) {
+      setLocalPaymentRequest(request);
+      setSeconds(60);
+      setQrVisible(true);
+      setPinModalVisible(false);
+      setPinError('');
+    } else {
+      setPinError('Invalid PIN. Please try again.');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
   };
 
   return (
@@ -718,22 +898,30 @@ function PayScreen({ onBack }: { onBack: () => void }) {
             <View style={styles.qrModalHeader}>
               <View>
                 <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>PAYMENT REQUEST</Text>
-                <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>{zar(paymentRequest?.amount ?? number)}</Text>
+                <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>{zar(localPaymentRequest?.amount ?? paymentRequest?.amount ?? number)}</Text>
               </View>
               <HapticPressable onPress={() => setQrVisible(false)} style={styles.closeButton}>
                 <Feather name="x" size={20} color={colors.foreground} />
               </HapticPressable>
             </View>
-            <QRCode seed={paymentRequest?.token ?? 'paymerch-demo'} />
+            <QRCode seed={localPaymentRequest?.token ?? paymentRequest?.token ?? 'paymerch-demo'} />
             <View style={[styles.timerPill, { backgroundColor: colors.warm }]}>
               <Feather name="clock" size={15} color={colors.warning} />
               <Text style={[styles.timerText, { color: colors.warning }]}>{seconds}s remaining</Text>
             </View>
             <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>Show this code to the seller. It can only be used once.</Text>
-            <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{paymentRequest?.token ?? 'tok_demo_pm'}</Text>
+            <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{localPaymentRequest?.token ?? paymentRequest?.token ?? 'tok_demo_pm'}</Text>
           </View>
         </View>
       </Modal>
+      <PinConfirmationModal
+        visible={pinModalVisible}
+        onConfirm={handlePinConfirm}
+        onCancel={() => setPinModalVisible(false)}
+        title="Confirm Payment"
+        error={pinError}
+        onClearError={() => setPinError('')}
+      />
     </View>
   );
 }
@@ -743,13 +931,28 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
   const insets = useSafeAreaInsets();
   const { paymentRequest, completePayment, online } = useWallet();
   const [result, setResult] = useState<'idle' | 'success' | 'offline'>('idle');
+  const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [pendingAmount, setPendingAmount] = useState(0);
+  const [pinError, setPinError] = useState('');
   const hasRequest = Boolean(paymentRequest && paymentRequest.expiresAt > Date.now());
 
   const scan = () => {
     const amount = hasRequest ? paymentRequest?.amount ?? 35 : 35;
-    completePayment(amount, hasRequest ? 'QR' : 'DEMO');
-    setResult(online ? 'success' : 'offline');
-    void Haptics.notificationAsync(online ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning);
+    setPendingAmount(amount);
+    setPinModalVisible(true);
+  };
+
+  const handlePinConfirm = (pin: string) => {
+    const success = completePayment(pendingAmount, hasRequest ? 'QR' : 'DEMO', pin);
+    if (success) {
+      setResult(online ? 'success' : 'offline');
+      setPinModalVisible(false);
+      setPinError('');
+      void Haptics.notificationAsync(online ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning);
+    } else {
+      setPinError('Invalid PIN. Please try again.');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
   };
 
   if (result !== 'idle') {
@@ -805,6 +1008,14 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <Text style={[styles.scanDemoText, { color: colors.foreground }]}>{hasRequest ? 'Collect customer payment' : 'Use demo payment · R35'}</Text>
       </HapticPressable>
       <Text style={styles.scannerFootnote}>Camera access is simulated in this prototype</Text>
+      <PinConfirmationModal
+        visible={pinModalVisible}
+        onConfirm={handlePinConfirm}
+        onCancel={() => setPinModalVisible(false)}
+        title="Confirm Payment"
+        error={pinError}
+        onClearError={() => setPinError('')}
+      />
     </View>
   );
 }
@@ -818,25 +1029,42 @@ function VasScreen({ onBack }: { onBack: () => void }) {
   const [amount, setAmount] = useState(50);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [pinModalVisible, setPinModalVisible] = useState(false);
   const options = kind === 'VAS_ELEC' ? [20, 50, 100, 200] : [10, 20, 50, 100];
 
   const vend = () => {
-    const result = vendVas(kind, amount, destination);
-    if (kind === 'VAS_ELEC' && result) {
+    if (kind === 'VAS_ELEC') {
+      if (!destination.trim() || amount > buyerBalance) {
+        setError('Add a meter number and choose an amount within your balance.');
+        return;
+      }
+    } else if (kind === 'VAS_AIRTIME') {
+      if (!destination.trim() || amount > buyerBalance) {
+        setError('Add a valid phone number and choose an amount within your balance.');
+        return;
+      }
+    }
+    setPinModalVisible(true);
+  };
+
+  const handlePinConfirm = (pin: string) => {
+    const result = vendVas(kind, amount, destination, pin);
+    if (result === 'INVALID_PIN') {
+      setError('Invalid PIN. Please try again.');
+      return;
+    }
+    if (result === null) {
+      setError('Invalid details. Please check your input.');
+      return;
+    }
+    if (kind === 'VAS_ELEC' && result !== 'SUCCESS') {
       setToken(result);
       setError('');
-      return;
+    } else if (kind === 'VAS_AIRTIME' && result === 'SUCCESS') {
+      setToken('airtime');
+      setError('');
     }
-    if (kind === 'VAS_AIRTIME') {
-      if (destination.trim() && amount <= buyerBalance) {
-        setToken('airtime');
-        setError('');
-      } else {
-        setError('Add a valid phone number and choose an amount within your balance.');
-      }
-      return;
-    }
-    setError('Add a meter number and choose an amount within your balance.');
+    setPinModalVisible(false);
   };
 
   if (token) {
@@ -925,6 +1153,14 @@ function VasScreen({ onBack }: { onBack: () => void }) {
         <Feather name="info" size={16} color={colors.accentForeground} />
         <Text style={[styles.infoText, { color: colors.accentForeground }]}>VAS sales are recorded in your wallet activity. Offline sales will show as pending until synced.</Text>
       </View>
+      <PinConfirmationModal
+        visible={pinModalVisible}
+        onConfirm={handlePinConfirm}
+        onCancel={() => setPinModalVisible(false)}
+        title="Confirm VAS Transaction"
+        error={error}
+        onClearError={() => setError('')}
+      />
     </ScrollView>
   );
 }
@@ -1079,9 +1315,22 @@ export default function PaymerchHome() {
   const [screen, setScreen] = useState<Screen>('home');
   const [cashOutVisible, setCashOutVisible] = useState(false);
   const [cashOutAmount, setCashOutAmount] = useState('100');
+  const [pinModalVisible, setPinModalVisible] = useState(false);
+  const [cashOutError, setCashOutError] = useState('');
   const [splashAcknowledged, setSplashAcknowledged] = useState(false);
   const colors = useColors();
   const { cashOut, merchantBalance } = useWallet();
+
+  const handleCashOutPinConfirm = (pin: string) => {
+    if (cashOut(Number(cashOutAmount), pin)) {
+      setCashOutVisible(false);
+      setPinModalVisible(false);
+      setCashOutError('');
+    } else {
+      setCashOutError('Invalid PIN. Please try again.');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
 
   if (!splashAcknowledged || !ready) return <AppSplashScreen onContinue={() => setSplashAcknowledged(true)} />;
   if (!signedIn) return <AuthScreen />;
@@ -1118,7 +1367,7 @@ export default function PaymerchHome() {
             <TextInput value={cashOutAmount} onChangeText={setCashOutAmount} keyboardType="decimal-pad" style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
             <HapticPressable
               onPress={() => {
-                if (cashOut(Number(cashOutAmount))) setCashOutVisible(false);
+                setPinModalVisible(true);
               }}
               disabled={Number(cashOutAmount) <= 0 || Number(cashOutAmount) > merchantBalance}
               style={[styles.primaryButton, { backgroundColor: colors.foreground, marginTop: 18 }]}
@@ -1129,6 +1378,14 @@ export default function PaymerchHome() {
           </View>
         </View>
       </Modal>
+      <PinConfirmationModal
+        visible={pinModalVisible}
+        onConfirm={handleCashOutPinConfirm}
+        onCancel={() => setPinModalVisible(false)}
+        title="Confirm Cash Out"
+        error={cashOutError}
+        onClearError={() => setCashOutError('')}
+      />
     </View>
   );
 }
@@ -1137,21 +1394,17 @@ const styles = StyleSheet.create({
   appRoot: { flex: 1 },
   loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
-  splashRoot: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 120, paddingBottom: 38 },
-  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1 },
-  splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8, marginTop: 21 },
-  splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 7 },
-  splashFooter: { alignItems: 'center', width: '100%' },
-  splashProgressTrack: { width: 104, height: 3, borderRadius: 2, overflow: 'hidden', marginBottom: 13 },
-  splashProgress: { width: '68%', height: '100%', borderRadius: 2 },
-  splashFooterText: { fontFamily: 'Inter_400Regular', fontSize: 11 },
-  splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minWidth: 150, paddingHorizontal: 18, paddingVertical: 13, marginTop: 20 },
+  splashRoot: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 120, paddingBottom: 60 },
+  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8 },
+  splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8 },
+  splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minWidth: 150, paddingHorizontal: 18, paddingVertical: 13 },
   splashActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   authRoot: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between' },
-  authTop: { alignItems: 'center', paddingTop: 76 },
-  brandName: { fontFamily: 'Inter_700Bold', fontSize: 16, letterSpacing: 3.4, marginTop: 14 },
-  tagline: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 5 },
-  authBody: { alignItems: 'center', width: '100%', marginTop: -10 },
+  authTop: { alignItems: 'center', paddingTop: 76, gap: 5 },
+  brandName: { fontFamily: 'Inter_700Bold', fontSize: 16, letterSpacing: 3.4 },
+  tagline: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  authBody: { alignItems: 'center', width: '100%', marginTop: 20 },
   authEyebrow: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.6 },
   authTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8 },
   authSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 9 },
@@ -1194,6 +1447,9 @@ const styles = StyleSheet.create({
   balanceFoot: { fontFamily: 'Inter_400Regular', color: '#A7A7A7', fontSize: 12 },
   secureBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   secureBadgeText: { fontFamily: 'Inter_500Medium', color: '#A7F3D0', fontSize: 11 },
+  pinModal: { borderRadius: 24, padding: 24, width: '90%', maxWidth: 360, alignSelf: 'center' },
+  pinModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  pinModalTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, marginTop: 4 },
   scanCta: { borderRadius: 22, minHeight: 112, padding: 18, marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   scanCtaEyebrow: { fontFamily: 'Inter_700Bold', color: '#A7A7A7', fontSize: 10, letterSpacing: 1.1 },
   scanCtaTitle: { fontFamily: 'Inter_700Bold', color: '#FFFFFF', fontSize: 22, marginTop: 6 },
