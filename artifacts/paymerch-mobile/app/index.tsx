@@ -283,7 +283,7 @@ function AuthScreen() {
     );
   }
 
-  return (
+  const authContent = (
     <View style={[styles.authRoot, { backgroundColor: colors.background }]}>
       <View style={styles.authTop}>
         <BrandMark size={58} />
@@ -333,6 +333,17 @@ function AuthScreen() {
       </Text>
     </View>
   );
+
+  // Add web container for proper centering on web
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webContainer}>
+        {authContent}
+      </View>
+    );
+  }
+
+  return authContent;
 }
 
 function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
@@ -411,7 +422,7 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
     };
   }, []);
 
-  return (
+  const splashContent = (
     <View style={[styles.splashRoot, { backgroundColor: colors.background }]}>
       <View style={styles.splashCenter}>
         <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
@@ -432,6 +443,17 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
       </Animated.View>
     </View>
   );
+
+  // Add web container for proper centering on web
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webContainer}>
+        {splashContent}
+      </View>
+    );
+  }
+
+  return splashContent;
 }
 
 function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRegistered: () => void }) {
@@ -1349,7 +1371,7 @@ export default function PaymerchHome() {
     return <HomeScreen onNavigate={navigate} onOpenCashOut={() => setCashOutVisible(true)} />;
   };
 
-  return (
+  const mainContent = (
     <View style={styles.appRoot}>
       {renderScreen()}
       {['home', 'pay', 'vas'].includes(screen) ? <BottomNav screen={screen} onNavigate={navigate} /> : null}
@@ -1388,22 +1410,34 @@ export default function PaymerchHome() {
       />
     </View>
   );
+
+  // Add web container for proper centering on web
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.webContainer}>
+        {mainContent}
+      </View>
+    );
+  }
+
+  return mainContent;
 }
 
 const styles = StyleSheet.create({
-  appRoot: { flex: 1 },
+  appRoot: { flex: 1, maxWidth: 480, alignSelf: 'center', width: '100%' },
+  webContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBFBFA' },
   loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
   splashRoot: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 120, paddingBottom: 60 },
-  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8 },
-  splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8 },
-  splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13 },
-  splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minWidth: 150, paddingHorizontal: 18, paddingVertical: 13 },
+  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, width: '100%' },
+  splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8, textAlign: 'left', alignSelf: 'flex-start' },
+  splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'left', alignSelf: 'flex-start' },
+  splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minWidth: 150, paddingHorizontal: 18, paddingVertical: 13, alignSelf: 'center' },
   splashActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  authRoot: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between' },
-  authTop: { alignItems: 'center', paddingTop: 76, gap: 5 },
-  brandName: { fontFamily: 'Inter_700Bold', fontSize: 16, letterSpacing: 3.4 },
-  tagline: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  authRoot: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between', maxWidth: 480, alignSelf: 'center', width: '100%' },
+  authTop: { alignItems: 'flex-start', paddingTop: 76, gap: 5, width: '100%' },
+  brandName: { fontFamily: 'Inter_700Bold', fontSize: 16, letterSpacing: 3.4, textAlign: 'left', alignSelf: 'flex-start' },
+  tagline: { fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'left', alignSelf: 'flex-start' },
   authBody: { alignItems: 'center', width: '100%', marginTop: 20 },
   authEyebrow: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.6 },
   authTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8 },

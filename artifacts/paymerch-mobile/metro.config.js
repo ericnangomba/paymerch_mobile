@@ -1,3 +1,8 @@
 const { getDefaultConfig } = require('expo/metro-config');
 
-module.exports = getDefaultConfig(__dirname);
+const config = getDefaultConfig(__dirname);
+
+// Add support for web assets
+config.resolver.assetExts.push('png', 'jpg', 'jpeg', 'gif', 'svg');
+
+module.exports = config;
