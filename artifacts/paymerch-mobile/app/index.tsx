@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { BusinessCategory, Transaction, useWallet } from '@/state/paymerch-context';
+import { AccountType, BusinessCategory, Transaction, UserProfile, useWallet } from '@/state/paymerch-context';
 
 type Screen = 'home' | 'pay' | 'scan' | 'vas' | 'activity' | 'settings';
 type IconName = React.ComponentProps<typeof Feather>['name'];
@@ -40,6 +40,14 @@ const timeLabel = (timestamp: number) => {
   if (minutes < 1440) return `${Math.round(minutes / 60)}h ago`;
   return `${Math.round(minutes / 1440)}d ago`;
 };
+
+const initialsFor = (name: string) =>
+  name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'PM';
 
 function HapticPressable({
   children,
@@ -88,6 +96,7 @@ function StatusPill({ online, colors }: { online: boolean; colors: ReturnType<ty
 function AuthScreen() {
   const colors = useColors();
   const { login, biometricLogin } = useWallet();
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [biometricLabel, setBiometricLabel] = useState('Use device unlock');
@@ -167,6 +176,10 @@ function AuthScreen() {
   const deleteDigit = () => setPin((value) => value.slice(0, -1));
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
+  if (mode === 'register') {
+    return <RegistrationScreen onBack={() => setMode('login')} />;
+  }
+
   return (
     <View style={[styles.authRoot, { backgroundColor: colors.background }]}>
       <View style={styles.authTop}>
@@ -210,11 +223,168 @@ function AuthScreen() {
           <Text style={[styles.biometricText, { color: colors.foreground }]}>{biometricLabel}</Text>
         </HapticPressable>
         <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>Demo PIN 123456</Text>
+        <HapticPressable onPress={() => setMode('register')} style={styles.registerLink}>
+          <Text style={[styles.registerLinkText, { color: colors.mutedForeground }]}>
+            New to Paymerch? <Text style={{ color: colors.foreground }}>Register</Text>
+          </Text>
+        </HapticPressable>
       </View>
       <Text style={[styles.secureFooter, { color: colors.mutedForeground }]}>
         <Feather name="shield" size={12} /> Your wallet is secured on this device
       </Text>
     </View>
+  );
+}
+
+function RegistrationScreen({ onBack }: { onBack: () => void }) {
+  const colors = useColors();
+  const insets = useSafeAreaInsets();
+  const { registerAccount } = useWallet();
+  const [accountType, setAccountType] = useState<AccountType>('business');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [category, setCategory] = useState<BusinessCategory>('Spaza shop');
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [error, setError] = useState('');
+
+  const submit = async () => {
+    const normalizedPhone = phone.replace(/\D/g, '');
+    if (name.trim().length < 2) {
+      setError(accountType === 'business' ? 'Enter your business or trading name.' : 'Enter your full name.');
+      return;
+    }
+    if (normalizedPhone.length < 9) {
+      setError('Enter a valid mobile number.');
+      return;
+    }
+    if (!/^\d{6}$/.test(pin)) {
+      setError('Your PIN must be exactly 6 digits.');
+      return;
+    }
+    if (pin !== confirmPin) {
+      setError('Your PINs do not match.');
+      return;
+    }
+    const profile: UserProfile = {
+      accountType,
+      name: name.trim(),
+      phone: phone.trim(),
+      ...(accountType === 'business' ? { businessCategory: category } : {}),
+    };
+    await registerAccount(profile, pin);
+  };
+
+  return (
+    <ScrollView
+      showsVerticalScrollIndicator={false}
+      contentContainerStyle={[styles.registrationRoot, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 26 }]}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.registrationHeader}>
+        <HapticPressable onPress={onBack} style={styles.backButton}>
+          <Feather name="arrow-left" size={21} color={colors.foreground} />
+        </HapticPressable>
+        <BrandMark size={42} />
+        <View style={{ width: 42 }} />
+      </View>
+      <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>GET STARTED</Text>
+      <Text style={[styles.registrationTitle, { color: colors.foreground }]}>Create your wallet</Text>
+      <Text style={[styles.registrationSubtitle, { color: colors.mutedForeground }]}>
+        One account for your everyday payments, sales, and services.
+      </Text>
+      <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 25 }]}>I AM REGISTERING AS</Text>
+      <View style={[styles.segmented, { backgroundColor: colors.muted }]}>
+        {(['business', 'individual'] as AccountType[]).map((type) => {
+          const selected = accountType === type;
+          return (
+            <HapticPressable
+              key={type}
+              onPress={() => { setAccountType(type); setError(''); }}
+              style={[styles.segment, selected && { backgroundColor: colors.card }]}
+            >
+              <Feather name={type === 'business' ? 'briefcase' : 'user'} size={16} color={selected ? colors.foreground : colors.mutedForeground} />
+              <Text style={[styles.segmentText, { color: selected ? colors.foreground : colors.mutedForeground }]}>
+                {type === 'business' ? 'Business' : 'Individual'}
+              </Text>
+            </HapticPressable>
+          );
+        })}
+      </View>
+      <Text style={[styles.formLabel, { color: colors.foreground }]}>{accountType === 'business' ? 'BUSINESS OR TRADING NAME' : 'FULL NAME'}</Text>
+      <TextInput
+        value={name}
+        onChangeText={(value) => { setName(value); setError(''); }}
+        placeholder={accountType === 'business' ? 'e.g. Lungile’s Spaza' : 'e.g. Lungile Mokoena'}
+        placeholderTextColor={colors.mutedForeground}
+        autoCapitalize="words"
+        style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+      />
+      {accountType === 'business' ? (
+        <>
+          <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 20 }]}>TYPE OF BUSINESS</Text>
+          <View style={styles.categoryGrid}>
+            {businessCategories.map((item) => {
+              const selected = category === item;
+              return (
+                <HapticPressable
+                  key={item}
+                  onPress={() => setCategory(item)}
+                  style={[styles.categoryChip, { backgroundColor: selected ? colors.foreground : colors.card, borderColor: selected ? colors.foreground : colors.border }]}
+                >
+                  <Text style={[styles.categoryChipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{item}</Text>
+                </HapticPressable>
+              );
+            })}
+          </View>
+        </>
+      ) : null}
+      <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 20 }]}>MOBILE NUMBER</Text>
+      <TextInput
+        value={phone}
+        onChangeText={(value) => { setPhone(value); setError(''); }}
+        placeholder="+27 72 555 0198"
+        placeholderTextColor={colors.mutedForeground}
+        keyboardType="phone-pad"
+        style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+      />
+      <View style={styles.registrationPinRow}>
+        <View style={styles.registrationPinField}>
+          <Text style={[styles.formLabel, { color: colors.foreground }]}>6-DIGIT PIN</Text>
+          <TextInput
+            value={pin}
+            onChangeText={(value) => { setPin(value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+            placeholder="••••••"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="number-pad"
+            secureTextEntry
+            maxLength={6}
+            style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+          />
+        </View>
+        <View style={styles.registrationPinField}>
+          <Text style={[styles.formLabel, { color: colors.foreground }]}>CONFIRM PIN</Text>
+          <TextInput
+            value={confirmPin}
+            onChangeText={(value) => { setConfirmPin(value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+            placeholder="••••••"
+            placeholderTextColor={colors.mutedForeground}
+            keyboardType="number-pad"
+            secureTextEntry
+            maxLength={6}
+            style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+          />
+        </View>
+      </View>
+      {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
+      <HapticPressable onPress={() => void submit()} style={[styles.primaryButton, { backgroundColor: colors.foreground, marginTop: 22 }]}>
+        <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
+        <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Create account</Text>
+      </HapticPressable>
+      <Text style={[styles.registrationNote, { color: colors.mutedForeground }]}>
+        Your account details and PIN are stored on this device in this prototype.
+      </Text>
+    </ScrollView>
   );
 }
 
@@ -249,13 +419,13 @@ function Header({
   );
 }
 
-function BalanceCard({ balance, online, onToggle }: { balance: number; online: boolean; onToggle: () => void }) {
+function BalanceCard({ balance, online, onToggle, label }: { balance: number; online: boolean; onToggle: () => void; label: string }) {
   const colors = useColors();
   const [hidden, setHidden] = useState(false);
   return (
     <View style={[styles.balanceCard, { backgroundColor: colors.dark }]}>
       <View style={styles.balanceTop}>
-        <Text style={styles.balanceLabel}>BUSINESS WALLET</Text>
+        <Text style={styles.balanceLabel}>{label}</Text>
         <HapticPressable onPress={onToggle} style={styles.balanceVisibility}>
           <Feather name={hidden ? 'eye-off' : 'eye'} size={17} color="#B8B8B8" />
         </HapticPressable>
@@ -327,14 +497,24 @@ function HomeScreen({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { merchantBalance, online, toggleOnline, transactions, businessCategory } = useWallet();
+  const { merchantBalance, online, toggleOnline, transactions, profile } = useWallet();
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
       contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: 124 }]}
     >
-      <Header title={`Lungile's ${businessCategory}`} subtitle="Informal business account" online={online} onSettings={() => onNavigate('settings')} />
-      <BalanceCard balance={merchantBalance} online={online} onToggle={toggleOnline} />
+      <Header
+        title={profile.name}
+        subtitle={profile.accountType === 'business' ? profile.businessCategory ?? 'Informal business' : 'Individual wallet'}
+        online={online}
+        onSettings={() => onNavigate('settings')}
+      />
+      <BalanceCard
+        balance={merchantBalance}
+        online={online}
+        onToggle={toggleOnline}
+        label={profile.accountType === 'business' ? 'BUSINESS WALLET' : 'PERSONAL WALLET'}
+      />
       <HapticPressable onPress={() => onNavigate('scan')} style={[styles.scanCta, { backgroundColor: colors.foreground }]}>
         <View>
           <Text style={styles.scanCtaEyebrow}>GET PAID</Text>
@@ -741,7 +921,7 @@ function ActivityScreen({ onBack }: { onBack: () => void }) {
 function SettingsScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory } = useWallet();
+  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory, profile } = useWallet();
   const pending = transactions.filter((transaction) => transaction.status === 'PENDING SYNC').length;
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 30 }]}>
@@ -756,30 +936,39 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
         <View style={{ width: 42 }} />
       </View>
       <View style={[styles.settingsProfile, { backgroundColor: colors.dark }]}>
-        <View style={styles.profileInitials}><Text style={styles.profileInitialText}>LF</Text></View>
+        <View style={styles.profileInitials}><Text style={styles.profileInitialText}>{initialsFor(profile.name)}</Text></View>
         <View>
-          <Text style={styles.settingsName}>Lungile's Market</Text>
-          <Text style={styles.settingsPhone}>+27 72 555 0198</Text>
+          <Text style={styles.settingsName}>{profile.name}</Text>
+          <Text style={styles.settingsPhone}>{profile.phone}</Text>
         </View>
       </View>
-      <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>BUSINESS TYPE</Text>
-      <View style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <Text style={[styles.categoryIntro, { color: colors.mutedForeground }]}>Choose the business you run. Paymerch works for everyday informal trade.</Text>
-        <View style={styles.categoryGrid}>
-          {businessCategories.map((category) => {
-            const selected = businessCategory === category;
-            return (
-              <HapticPressable
-                key={category}
-                onPress={() => setBusinessCategory(category)}
-                style={[styles.categoryChip, { backgroundColor: selected ? colors.foreground : colors.muted, borderColor: selected ? colors.foreground : colors.border }]}
-              >
-                <Text style={[styles.categoryChipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{category}</Text>
-              </HapticPressable>
-            );
-          })}
+      {profile.accountType === 'business' ? (
+        <>
+          <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>BUSINESS TYPE</Text>
+          <View style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.categoryIntro, { color: colors.mutedForeground }]}>Choose the business you run. Paymerch works for everyday informal trade.</Text>
+            <View style={styles.categoryGrid}>
+              {businessCategories.map((category) => {
+                const selected = businessCategory === category;
+                return (
+                  <HapticPressable
+                    key={category}
+                    onPress={() => setBusinessCategory(category)}
+                    style={[styles.categoryChip, { backgroundColor: selected ? colors.foreground : colors.muted, borderColor: selected ? colors.foreground : colors.border }]}
+                  >
+                    <Text style={[styles.categoryChipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{category}</Text>
+                  </HapticPressable>
+                );
+              })}
+            </View>
+          </View>
+        </>
+      ) : (
+        <View style={[styles.individualNote, { backgroundColor: colors.muted }]}>
+          <Feather name="user" size={16} color={colors.mutedForeground} />
+          <Text style={[styles.individualNoteText, { color: colors.mutedForeground }]}>Individual wallet selected. You can receive, send, and manage everyday payments without registering a business.</Text>
         </View>
-      </View>
+      )}
       <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>CONNECTION</Text>
       <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.settingRow}>
@@ -922,6 +1111,15 @@ const styles = StyleSheet.create({
   pinDots: { flexDirection: 'row', gap: 12, marginTop: 28, marginBottom: 14 },
   pinDot: { width: 10, height: 10, borderRadius: 5 },
   errorText: { fontFamily: 'Inter_500Medium', fontSize: 12, textAlign: 'center', marginTop: 7, maxWidth: 290 },
+  registerLink: { padding: 10, marginTop: 5 },
+  registerLinkText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+  registrationRoot: { paddingHorizontal: 18 },
+  registrationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
+  registrationTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8 },
+  registrationSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 20, marginTop: 9, maxWidth: 330 },
+  registrationPinRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  registrationPinField: { flex: 1 },
+  registrationNote: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 13, paddingHorizontal: 18 },
   pinPad: { width: '100%', maxWidth: 330, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
   pinKey: { width: 92, height: 53, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   pinKeyText: { fontFamily: 'Inter_500Medium', fontSize: 22 },
@@ -1068,6 +1266,8 @@ const styles = StyleSheet.create({
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   categoryChip: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9 },
   categoryChipText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
+  individualNote: { borderRadius: 16, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginBottom: 23 },
+  individualNoteText: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16 },
   settingsCard: { borderWidth: 1, borderRadius: 20, padding: 14, marginBottom: 23 },
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   settingIcon: { width: 37, height: 37, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },

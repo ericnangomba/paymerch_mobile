@@ -11,6 +11,14 @@ export type BusinessCategory =
   | 'Street food stall'
   | 'Tomatoes & veggies'
   | 'Mini bus taxi';
+export type AccountType = 'individual' | 'business';
+
+export type UserProfile = {
+  accountType: AccountType;
+  name: string;
+  phone: string;
+  businessCategory?: BusinessCategory;
+};
 
 export type Transaction = {
   id: string;
@@ -36,6 +44,8 @@ type PersistedWallet = {
   online: boolean;
   paymentRequest: PaymentRequest | null;
   businessCategory?: BusinessCategory;
+  profile?: UserProfile;
+  pin?: string;
 };
 
 type WalletContextValue = {
@@ -47,8 +57,10 @@ type WalletContextValue = {
   online: boolean;
   paymentRequest: PaymentRequest | null;
   businessCategory: BusinessCategory;
+  profile: UserProfile;
   login: (pin: string) => Promise<boolean>;
   biometricLogin: () => Promise<void>;
+  registerAccount: (profile: UserProfile, pin: string) => Promise<void>;
   logout: () => Promise<void>;
   toggleOnline: () => void;
   syncPending: () => void;
@@ -61,6 +73,12 @@ type WalletContextValue = {
 
 const STORAGE_KEY = 'paymerch-wallet-v1';
 const SESSION_KEY = 'paymerch-session-v1';
+const DEFAULT_PROFILE: UserProfile = {
+  accountType: 'business',
+  name: "Lungile's Market",
+  phone: '+27 72 555 0198',
+  businessCategory: 'Spaza shop',
+};
 const DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: 'pm-1',
@@ -127,6 +145,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(true);
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
   const [businessCategory, setBusinessCategory] = useState<BusinessCategory>('Spaza shop');
+  const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
+  const [storedPin, setStoredPin] = useState('123456');
 
   useEffect(() => {
     let cancelled = false;
@@ -145,6 +165,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           setOnline(wallet.online);
           setPaymentRequest(wallet.paymentRequest);
           setBusinessCategory(wallet.businessCategory ?? 'Spaza shop');
+          setProfile(wallet.profile ?? DEFAULT_PROFILE);
+          setStoredPin(wallet.pin ?? '123456');
         } catch {
           await AsyncStorage.removeItem(STORAGE_KEY);
         }
@@ -167,20 +189,32 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       online,
       paymentRequest,
       businessCategory,
+      profile,
+      pin: storedPin,
     };
     void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(wallet));
-  }, [buyerBalance, merchantBalance, transactions, online, paymentRequest, businessCategory, ready]);
+  }, [buyerBalance, merchantBalance, transactions, online, paymentRequest, businessCategory, profile, storedPin, ready]);
 
   const login = useCallback(async (pin: string) => {
-    const valid = pin === '123456';
+    const valid = pin === storedPin;
     if (valid) {
       setSignedIn(true);
       await AsyncStorage.setItem(SESSION_KEY, 'active');
     }
     return valid;
-  }, []);
+  }, [storedPin]);
 
   const biometricLogin = useCallback(async () => {
+    setSignedIn(true);
+    await AsyncStorage.setItem(SESSION_KEY, 'active');
+  }, []);
+
+  const registerAccount = useCallback(async (nextProfile: UserProfile, pin: string) => {
+    setProfile(nextProfile);
+    setStoredPin(pin);
+    if (nextProfile.businessCategory) {
+      setBusinessCategory(nextProfile.businessCategory);
+    }
     setSignedIn(true);
     await AsyncStorage.setItem(SESSION_KEY, 'active');
   }, []);
@@ -281,6 +315,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const updateBusinessCategory = useCallback((category: BusinessCategory) => {
     setBusinessCategory(category);
+    setProfile((current) =>
+      current.accountType === 'business'
+        ? { ...current, businessCategory: category }
+        : current,
+    );
   }, []);
 
   const value = useMemo(
@@ -293,8 +332,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       online,
       paymentRequest,
       businessCategory,
+      profile,
       login,
       biometricLogin,
+      registerAccount,
       logout,
       toggleOnline,
       syncPending,
@@ -313,8 +354,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       online,
       paymentRequest,
       businessCategory,
+      profile,
       login,
       biometricLogin,
+      registerAccount,
       logout,
       toggleOnline,
       syncPending,

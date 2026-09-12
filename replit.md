@@ -34,12 +34,13 @@ Paymerch Mobile is a local-first digital wallet prototype for unbanked informal 
 - The first build is Expo/frontend-only and uses AsyncStorage so the entire demo works without external accounts or provider credentials.
 - The payment flow uses customer-generated dynamic QR requests and seller scan simulation, with a local double-entry-style balance shift. Mini-bus fares are supported as one business category alongside other informal businesses.
 - Biometric unlock uses Expo Local Authentication on physical devices and keeps the six-digit PIN as the fallback for web, unsupported devices, and cancelled prompts.
+- Registration supports individual wallets and business wallets, with business categories for spaza shops, street vendors, carwashes, tshisa nyama, street food, produce sellers, and mini-bus taxis.
 - Offline mode marks new payment and VAS activity as `PENDING SYNC`; reconnecting can promote pending activity to `SUCCESS`.
 - The generated QR is a deterministic visual mock for the signed token flow; production should replace it with a server-signed QR payload and native camera scanning.
 
 ## Product
 
-Paymerch Mobile lets an informal trader unlock a business wallet, collect payments by scanning a customer's one-time QR, sell airtime or electricity tokens, cash out, review activity, and simulate offline transaction caching. Supported business types include spaza shops, street vendors, carwashes, tshisa nyama, street food stalls, tomatoes and veggies sellers, and mini-bus taxis.
+Paymerch Mobile lets an individual or informal trader register a wallet, collect payments by scanning a customer's one-time QR, sell airtime or electricity tokens, cash out, review activity, and simulate offline transaction caching. Supported business types include spaza shops, street vendors, carwashes, tshisa nyama, street food stalls, tomatoes and veggies sellers, and mini-bus taxis.
 
 ## User preferences
 
