@@ -99,6 +99,7 @@ function AuthScreen() {
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [registrationMessage, setRegistrationMessage] = useState('');
   const [biometricLabel, setBiometricLabel] = useState('Use device unlock');
 
   useEffect(() => {
@@ -163,6 +164,7 @@ function AuthScreen() {
     const next = `${pin}${digit}`;
     setPin(next);
     setError('');
+    setRegistrationMessage('');
     if (next.length === 6) {
       const valid = await login(next);
       if (!valid) {
@@ -177,7 +179,16 @@ function AuthScreen() {
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
   if (mode === 'register') {
-    return <RegistrationScreen onBack={() => setMode('login')} />;
+    return (
+      <RegistrationScreen
+        onBack={() => setMode('login')}
+        onRegistered={() => {
+          setMode('login');
+          setPin('');
+          setRegistrationMessage('Account created. Log in with your new PIN to open your ledger.');
+        }}
+      />
+    );
   }
 
   return (
@@ -201,6 +212,7 @@ function AuthScreen() {
             />
           ))}
         </View>
+        {registrationMessage ? <Text style={[styles.errorText, { color: colors.success }]}>{registrationMessage}</Text> : null}
         {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
         <View style={styles.pinPad}>
           {keys.map((key) => (
@@ -223,7 +235,7 @@ function AuthScreen() {
           <Text style={[styles.biometricText, { color: colors.foreground }]}>{biometricLabel}</Text>
         </HapticPressable>
         <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>Demo PIN 123456</Text>
-        <HapticPressable onPress={() => setMode('register')} style={styles.registerLink}>
+        <HapticPressable onPress={() => { setRegistrationMessage(''); setMode('register'); }} style={styles.registerLink}>
           <Text style={[styles.registerLinkText, { color: colors.mutedForeground }]}>
             New to Paymerch? <Text style={{ color: colors.foreground }}>Register</Text>
           </Text>
@@ -236,7 +248,7 @@ function AuthScreen() {
   );
 }
 
-function AppSplashScreen() {
+function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
   const colors = useColors();
   return (
     <View style={[styles.splashRoot, { backgroundColor: colors.background }]}>
@@ -250,12 +262,16 @@ function AppSplashScreen() {
           <View style={[styles.splashProgress, { backgroundColor: colors.foreground }]} />
         </View>
         <Text style={[styles.splashFooterText, { color: colors.mutedForeground }]}>Your wallet, ready for everyday trade</Text>
+        <HapticPressable onPress={onContinue} style={[styles.splashAction, { backgroundColor: colors.foreground }]}>
+          <Text style={[styles.splashActionText, { color: colors.primaryForeground }]}>Get started</Text>
+          <Feather name="arrow-right" size={16} color={colors.primaryForeground} />
+        </HapticPressable>
       </View>
     </View>
   );
 }
 
-function RegistrationScreen({ onBack }: { onBack: () => void }) {
+function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRegistered: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { registerAccount } = useWallet();
@@ -292,6 +308,7 @@ function RegistrationScreen({ onBack }: { onBack: () => void }) {
       ...(accountType === 'business' ? { businessCategory: category } : {}),
     };
     await registerAccount(profile, pin);
+    onRegistered();
   };
 
   return (
@@ -1062,16 +1079,11 @@ export default function PaymerchHome() {
   const [screen, setScreen] = useState<Screen>('home');
   const [cashOutVisible, setCashOutVisible] = useState(false);
   const [cashOutAmount, setCashOutAmount] = useState('100');
-  const [showAppSplash, setShowAppSplash] = useState(true);
+  const [splashAcknowledged, setSplashAcknowledged] = useState(false);
   const colors = useColors();
   const { cashOut, merchantBalance } = useWallet();
 
-  useEffect(() => {
-    const timer = setTimeout(() => setShowAppSplash(false), 1500);
-    return () => clearTimeout(timer);
-  }, []);
-
-  if (showAppSplash || !ready) return <AppSplashScreen />;
+  if (!splashAcknowledged || !ready) return <AppSplashScreen onContinue={() => setSplashAcknowledged(true)} />;
   if (!signedIn) return <AuthScreen />;
 
   const navigate = (next: Screen) => {
@@ -1133,6 +1145,8 @@ const styles = StyleSheet.create({
   splashProgressTrack: { width: 104, height: 3, borderRadius: 2, overflow: 'hidden', marginBottom: 13 },
   splashProgress: { width: '68%', height: '100%', borderRadius: 2 },
   splashFooterText: { fontFamily: 'Inter_400Regular', fontSize: 11 },
+  splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minWidth: 150, paddingHorizontal: 18, paddingVertical: 13, marginTop: 20 },
+  splashActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   authRoot: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between' },
   authTop: { alignItems: 'center', paddingTop: 76 },
   brandName: { fontFamily: 'Inter_700Bold', fontSize: 16, letterSpacing: 3.4, marginTop: 14 },

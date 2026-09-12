@@ -27,7 +27,7 @@ Paymerch Mobile is a local-first digital wallet prototype for unbanked informal 
 - `artifacts/paymerch-mobile/constants/colors.ts` — Paymerch light and dark semantic theme tokens.
 - `artifacts/paymerch-mobile/assets/images/paymerch-icon.png` — supplied Paymerch shield mark used by the app.
 - `artifacts/paymerch-mobile/app.json` — Expo app identity, icon, and branded native splash configuration.
-- The app also shows a short branded in-app splash after native startup, before the PIN screen or wallet loads.
+- The app holds on a branded in-app splash after native startup until the user taps Get started; registration then returns to login, and only successful login opens the wallet ledger.
 - `artifacts/api-server` — shared API scaffold, intentionally not required for the first local-first prototype.
 
 ## Architecture decisions

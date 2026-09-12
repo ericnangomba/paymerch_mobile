@@ -215,8 +215,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (nextProfile.businessCategory) {
       setBusinessCategory(nextProfile.businessCategory);
     }
-    setSignedIn(true);
-    await AsyncStorage.setItem(SESSION_KEY, 'active');
+    setSignedIn(false);
+    await AsyncStorage.removeItem(SESSION_KEY);
   }, []);
 
   const logout = useCallback(async () => {
