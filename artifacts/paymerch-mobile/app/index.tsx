@@ -236,6 +236,25 @@ function AuthScreen() {
   );
 }
 
+function AppSplashScreen() {
+  const colors = useColors();
+  return (
+    <View style={[styles.splashRoot, { backgroundColor: colors.background }]}>
+      <View style={styles.splashCenter}>
+        <BrandMark size={86} />
+        <Text style={[styles.splashBrandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
+        <Text style={[styles.splashTagline, { color: colors.mutedForeground }]}>Simply Secure Payments</Text>
+      </View>
+      <View style={styles.splashFooter}>
+        <View style={[styles.splashProgressTrack, { backgroundColor: colors.border }]}>
+          <View style={[styles.splashProgress, { backgroundColor: colors.foreground }]} />
+        </View>
+        <Text style={[styles.splashFooterText, { color: colors.mutedForeground }]}>Your wallet, ready for everyday trade</Text>
+      </View>
+    </View>
+  );
+}
+
 function RegistrationScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -1043,10 +1062,16 @@ export default function PaymerchHome() {
   const [screen, setScreen] = useState<Screen>('home');
   const [cashOutVisible, setCashOutVisible] = useState(false);
   const [cashOutAmount, setCashOutAmount] = useState('100');
+  const [showAppSplash, setShowAppSplash] = useState(true);
   const colors = useColors();
   const { cashOut, merchantBalance } = useWallet();
 
-  if (!ready) return <View style={[styles.loadingRoot, { backgroundColor: colors.background }]}><BrandMark size={58} /><Text style={[styles.loadingText, { color: colors.mutedForeground }]}>Securing your wallet…</Text></View>;
+  useEffect(() => {
+    const timer = setTimeout(() => setShowAppSplash(false), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (showAppSplash || !ready) return <AppSplashScreen />;
   if (!signedIn) return <AuthScreen />;
 
   const navigate = (next: Screen) => {
@@ -1100,6 +1125,14 @@ const styles = StyleSheet.create({
   appRoot: { flex: 1 },
   loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
+  splashRoot: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 120, paddingBottom: 38 },
+  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1 },
+  splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8, marginTop: 21 },
+  splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: 7 },
+  splashFooter: { alignItems: 'center', width: '100%' },
+  splashProgressTrack: { width: 104, height: 3, borderRadius: 2, overflow: 'hidden', marginBottom: 13 },
+  splashProgress: { width: '68%', height: '100%', borderRadius: 2 },
+  splashFooterText: { fontFamily: 'Inter_400Regular', fontSize: 11 },
   authRoot: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between' },
   authTop: { alignItems: 'center', paddingTop: 76 },
   brandName: { fontFamily: 'Inter_700Bold', fontSize: 16, letterSpacing: 3.4, marginTop: 14 },
