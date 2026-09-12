@@ -1,5 +1,6 @@
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as LocalAuthentication from 'expo-local-authentication';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Image,
@@ -89,6 +90,64 @@ function AuthScreen() {
   const { login, biometricLogin } = useWallet();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [biometricLabel, setBiometricLabel] = useState('Use device unlock');
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadBiometricLabel = async () => {
+      if (Platform.OS === 'web') return;
+      try {
+        const [hasHardware, isEnrolled] = await Promise.all([
+          LocalAuthentication.hasHardwareAsync(),
+          LocalAuthentication.isEnrolledAsync(),
+        ]);
+        if (!hasHardware || !isEnrolled || cancelled) return;
+        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+        const label = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
+          ? 'Use Face ID'
+          : types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
+            ? 'Use fingerprint'
+            : 'Use device unlock';
+        if (!cancelled) setBiometricLabel(label);
+      } catch {
+        // The PIN remains available when device authentication cannot be inspected.
+      }
+    };
+    void loadBiometricLabel();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleBiometricUnlock = async () => {
+    setError('');
+    if (Platform.OS === 'web') {
+      setError('Biometrics are available on a physical device. Use your PIN in this preview.');
+      return;
+    }
+    try {
+      const [hasHardware, isEnrolled] = await Promise.all([
+        LocalAuthentication.hasHardwareAsync(),
+        LocalAuthentication.isEnrolledAsync(),
+      ]);
+      if (!hasHardware || !isEnrolled) {
+        setError('No enrolled biometrics were found. Use your 6-digit PIN instead.');
+        return;
+      }
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Unlock Paymerch Mobile',
+        cancelLabel: 'Use PIN',
+        fallbackLabel: 'Use PIN',
+      });
+      if (result.success) {
+        await biometricLogin();
+      } else if (result.error !== 'user_cancel' && result.error !== 'system_cancel') {
+        setError('Biometric unlock was not completed. Use your 6-digit PIN.');
+      }
+    } catch {
+      setError('Biometric unlock is unavailable. Use your 6-digit PIN.');
+    }
+  };
 
   const enterDigit = async (digit: string) => {
     if (pin.length >= 6) return;
@@ -136,7 +195,7 @@ function AuthScreen() {
               <Text style={[styles.pinKeyText, { color: colors.foreground }]}>{key}</Text>
             </HapticPressable>
           ))}
-          <HapticPressable onPress={() => void biometricLogin()} style={styles.pinKey}>
+          <HapticPressable onPress={() => void handleBiometricUnlock()} style={styles.pinKey}>
             <Feather name="lock" size={20} color={colors.foreground} />
           </HapticPressable>
           <HapticPressable onPress={() => void enterDigit('0')} style={styles.pinKey}>
@@ -146,9 +205,9 @@ function AuthScreen() {
             <Feather name="delete" size={21} color={colors.foreground} />
           </HapticPressable>
         </View>
-        <HapticPressable onPress={() => void biometricLogin()} style={styles.biometricButton}>
+        <HapticPressable onPress={() => void handleBiometricUnlock()} style={styles.biometricButton}>
           <Feather name="smartphone" size={17} color={colors.foreground} />
-          <Text style={[styles.biometricText, { color: colors.foreground }]}>Use device unlock</Text>
+          <Text style={[styles.biometricText, { color: colors.foreground }]}>{biometricLabel}</Text>
         </HapticPressable>
         <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>Demo PIN 123456</Text>
       </View>

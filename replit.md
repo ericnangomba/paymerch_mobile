@@ -33,6 +33,7 @@ Paymerch Mobile is a local-first digital wallet prototype for unbanked informal 
 
 - The first build is Expo/frontend-only and uses AsyncStorage so the entire demo works without external accounts or provider credentials.
 - The payment flow uses customer-generated dynamic QR requests and seller scan simulation, with a local double-entry-style balance shift. Mini-bus fares are supported as one business category alongside other informal businesses.
+- Biometric unlock uses Expo Local Authentication on physical devices and keeps the six-digit PIN as the fallback for web, unsupported devices, and cancelled prompts.
 - Offline mode marks new payment and VAS activity as `PENDING SYNC`; reconnecting can promote pending activity to `SUCCESS`.
 - The generated QR is a deterministic visual mock for the signed token flow; production should replace it with a server-signed QR payload and native camera scanning.
 
