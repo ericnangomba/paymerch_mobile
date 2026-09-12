@@ -1,9 +1,10 @@
 [build]
-  command = "cd artifacts/paymerch-mobile && pnpm install && pnpm run build:web"
+  command = "cd artifacts/paymerch-mobile && pnpm install && npx expo export --platform web"
   publish = "artifacts/paymerch-mobile/dist"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
+  NPM_FLAGS = "--legacy-peer-deps"
 
 [[redirects]]
   from = "/*"
