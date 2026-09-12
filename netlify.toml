@@ -1,0 +1,30 @@
+[build]
+  command = "cd artifacts/paymerch-mobile && pnpm install && pnpm run build:web"
+  publish = "artifacts/paymerch-mobile/dist"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[dev]
+  command = "cd artifacts/paymerch-mobile && pnpm run dev"
+  targetPort = 8081
+  publish = "artifacts/paymerch-mobile/dist"
+  autoLaunch = false
