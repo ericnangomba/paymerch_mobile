@@ -350,8 +350,6 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
   const colors = useColors();
   const logoOpacity = useMemo(() => new Animated.Value(0), []);
   const logoScale = useMemo(() => new Animated.Value(0.8), []);
-  const textOpacity = useMemo(() => new Animated.Value(0), []);
-  const textTranslateY = useMemo(() => new Animated.Value(20), []);
   const buttonOpacity = useMemo(() => new Animated.Value(0), []);
   const buttonTranslateY = useMemo(() => new Animated.Value(30), []);
   const buttonScale = useMemo(() => new Animated.Value(1), []);
@@ -368,18 +366,6 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
           toValue: 1,
           friction: 8,
           tension: 40,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(textOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(textTranslateY, {
-          toValue: 0,
-          duration: 600,
           useNativeDriver: true,
         }),
       ]),
@@ -426,11 +412,7 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
     <View style={[styles.splashRoot, { backgroundColor: colors.background }]}>
       <View style={styles.splashCenter}>
         <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
-          <BrandMark size={70} />
-        </Animated.View>
-        <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textTranslateY }] }}>
-          <Text style={[styles.splashBrandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
-          <Text style={[styles.splashTagline, { color: colors.mutedForeground }]}>Simply Secure Payments</Text>
+          <BrandMark size={120} />
         </Animated.View>
       </View>
       <Animated.View style={{ opacity: buttonOpacity, transform: [{ translateY: buttonTranslateY }] }}>
@@ -506,7 +488,7 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
         <HapticPressable onPress={onBack} style={styles.backButton}>
           <Feather name="arrow-left" size={21} color={colors.foreground} />
         </HapticPressable>
-        <BrandMark size={30} />
+        <BrandMark size={120} />
         <View style={{ width: 42 }} />
       </View>
       <View style={styles.authBody}>
