@@ -435,9 +435,9 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
       </View>
       <Animated.View style={{ opacity: buttonOpacity, transform: [{ translateY: buttonTranslateY }] }}>
         <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-          <HapticPressable onPress={onContinue} style={[styles.splashAction, { backgroundColor: colors.accent }]}>
-            <Text style={[styles.splashActionText, { color: colors.accentForeground }]}>Get started</Text>
-            <Feather name="arrow-right" size={16} color={colors.accentForeground} />
+          <HapticPressable onPress={onContinue} style={[styles.splashAction, { backgroundColor: colors.foreground }]}>
+            <Text style={[styles.splashActionText, { color: colors.primaryForeground }]}>Get started</Text>
+            <Feather name="arrow-right" size={16} color={colors.primaryForeground} />
           </HapticPressable>
         </Animated.View>
       </Animated.View>
@@ -1425,13 +1425,13 @@ export default function PaymerchHome() {
 
 const styles = StyleSheet.create({
   appRoot: { flex: 1, maxWidth: 480, alignSelf: 'center', width: '100%' },
-  webContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBFBFA', minHeight: '100vh' },
+  webContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBFBFA' },
   loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
   splashRoot: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 120, paddingBottom: 60 },
-  splashCenter: { alignItems: 'flex-start', justifyContent: 'center', flex: 1, gap: 8, width: '100%' },
-  splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8 },
-  splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13 },
+  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, width: '100%' },
+  splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8, textAlign: 'center' },
+  splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center' },
   splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minWidth: 150, paddingHorizontal: 18, paddingVertical: 13, alignSelf: 'center' },
   splashActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   authRoot: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between', maxWidth: 480, alignSelf: 'center', width: '100%' },
