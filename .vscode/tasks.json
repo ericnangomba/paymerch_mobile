@@ -1,0 +1,11 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start Paymerch Mobile",
+      "type": "shell",
+      "command": "pnpm --filter @workspace/paymerch-mobile exec expo start --localhost --port 8082",
+      "inAgents": true
+    }
+  ]
+}

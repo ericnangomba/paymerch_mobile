@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors } from '@/hooks/useColors';
-import { AccountType, BusinessCategory, Transaction, UserProfile, PaymentRequest, useWallet } from '@/state/paymerch-context';
+import { AccountType, BankAccount, BusinessCategory, Transaction, UserProfile, PaymentRequest, useWallet } from '@/state/paymerch-context';
 
 type Screen = 'home' | 'pay' | 'scan' | 'vas' | 'activity' | 'settings';
 type IconName = React.ComponentProps<typeof Feather>['name'];
@@ -655,6 +655,8 @@ function ActivityRow({ transaction, colors }: { transaction: Transaction; colors
         ? 'phone'
         : transaction.kind === 'CASH_OUT'
           ? 'download'
+          : transaction.kind === 'TOP_UP'
+            ? 'upload'
           : 'arrow-down-left';
   const tint = transaction.status === 'PENDING SYNC' ? colors.warning : transaction.direction === 'in' ? colors.success : colors.foreground;
   return (
@@ -696,9 +698,11 @@ function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; 
 function HomeScreen({
   onNavigate,
   onOpenCashOut,
+  onOpenTopUp,
 }: {
   onNavigate: (screen: Screen) => void;
   onOpenCashOut: () => void;
+  onOpenTopUp: () => void;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -737,6 +741,7 @@ function HomeScreen({
       <View style={styles.actionGrid}>
         <QuickAction icon="zap" label="Sell VAS" onPress={() => onNavigate('vas')} />
         <QuickAction icon="credit-card" label="Customer pays" onPress={() => onNavigate('pay')} />
+        <QuickAction icon="upload" label="Top up" onPress={onOpenTopUp} />
         <QuickAction icon="download" label="Cash out" onPress={onOpenCashOut} />
       </View>
       <View style={styles.sectionHeader}>
@@ -939,17 +944,31 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
   const [result, setResult] = useState<'idle' | 'success' | 'offline'>('idle');
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [pendingAmount, setPendingAmount] = useState(0);
+  const [paymentAmount, setPaymentAmount] = useState('35');
+  const [paymentDescription, setPaymentDescription] = useState('');
+  const [scanError, setScanError] = useState('');
   const [pinError, setPinError] = useState('');
   const hasRequest = Boolean(paymentRequest && paymentRequest.expiresAt > Date.now());
 
+  useEffect(() => {
+    if (hasRequest && paymentRequest) {
+      setPaymentAmount(String(paymentRequest.amount));
+    }
+  }, [hasRequest, paymentRequest]);
+
   const scan = () => {
-    const amount = hasRequest ? paymentRequest?.amount ?? 35 : 35;
-    setPendingAmount(amount);
+    const amount = Number(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setScanError('Enter a valid payment amount.');
+      return;
+    }
+    setScanError('');
+    setPendingAmount(Math.round(amount * 100) / 100);
     setPinModalVisible(true);
   };
 
   const handlePinConfirm = (pin: string) => {
-    const success = completePayment(pendingAmount, hasRequest ? 'QR' : 'DEMO', pin);
+    const success = completePayment(pendingAmount, hasRequest ? 'QR' : 'DEMO', pin, paymentDescription);
     if (success) {
       setResult(online ? 'success' : 'offline');
       setPinModalVisible(false);
@@ -1008,6 +1027,31 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <Text style={styles.scannerSubhint}>
           {hasRequest ? `${zar(paymentRequest?.amount ?? 35)} · Expires in 60 seconds` : 'The customer QR is single-use and signed.'}
         </Text>
+      </View>
+      <View style={styles.paymentDetailsCard}>
+        <Text style={styles.paymentDetailsTitle}>Payment received</Text>
+        <Text style={styles.paymentDetailsHint}>Add the amount and a note before recording this payment in your wallet.</Text>
+        <TextInput
+          value={paymentAmount}
+          onChangeText={(value) => {
+            setPaymentAmount(value);
+            setScanError('');
+            const parsed = Number(value);
+            if (Number.isFinite(parsed) && parsed > 0) setPendingAmount(parsed);
+          }}
+          placeholder="Amount"
+          placeholderTextColor="#8A8A8A"
+          keyboardType="decimal-pad"
+          style={styles.scannerInput}
+        />
+        <TextInput
+          value={paymentDescription}
+          onChangeText={setPaymentDescription}
+          placeholder="Description (e.g. groceries, taxi fare)"
+          placeholderTextColor="#8A8A8A"
+          style={styles.scannerInput}
+        />
+        {scanError ? <Text style={styles.scannerError}>{scanError}</Text> : null}
       </View>
       <HapticPressable onPress={scan} style={[styles.scanDemoButton, { backgroundColor: colors.button }]}>
         <Feather name="camera" size={18} color={colors.buttonForeground} />
@@ -1196,10 +1240,18 @@ function ActivityScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-function SettingsScreen({ onBack }: { onBack: () => void }) {
+function SettingsScreen({
+  onBack,
+  onOpenBankSetup,
+  onOpenTopUp,
+}: {
+  onBack: () => void;
+  onOpenBankSetup: () => void;
+  onOpenTopUp: () => void;
+}) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory, profile } = useWallet();
+  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory, profile, bankAccount } = useWallet();
   const pending = transactions.filter((transaction) => transaction.status === 'PENDING SYNC').length;
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 30 }]}>
@@ -1247,6 +1299,27 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
           <Text style={[styles.individualNoteText, { color: colors.mutedForeground }]}>Individual wallet selected. You can receive, send, and manage everyday payments without registering a business.</Text>
         </View>
       )}
+      <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>MONEY MOVEMENT</Text>
+      <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <View style={styles.settingRow}>
+          <View style={[styles.settingIcon, { backgroundColor: bankAccount ? colors.accent : colors.warm }]}>
+            <Feather name="credit-card" size={17} color={bankAccount ? colors.accentForeground : colors.warning} />
+          </View>
+          <View style={styles.settingCopy}>
+            <Text style={[styles.settingTitle, { color: colors.foreground }]}>{bankAccount ? bankAccount.bankName : 'Bank account not set up'}</Text>
+            <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>
+              {bankAccount ? `${bankAccount.accountType} · •••• ${bankAccount.accountNumber.slice(-4)}` : 'Required for cash out and top ups'}
+            </Text>
+          </View>
+          <HapticPressable onPress={onOpenBankSetup} style={[styles.smallAction, { backgroundColor: colors.muted }]}>
+            <Text style={[styles.smallActionText, { color: colors.foreground }]}>{bankAccount ? 'Edit' : 'Set up'}</Text>
+          </HapticPressable>
+        </View>
+        <HapticPressable onPress={onOpenTopUp} style={[styles.secondaryAction, { borderColor: colors.border }]}>
+          <Feather name="upload" size={16} color={colors.foreground} />
+          <Text style={[styles.secondaryActionText, { color: colors.foreground }]}>Top up wallet</Text>
+        </HapticPressable>
+      </View>
       <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>CONNECTION</Text>
       <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <View style={styles.settingRow}>
@@ -1321,11 +1394,20 @@ export default function PaymerchHome() {
   const [screen, setScreen] = useState<Screen>('home');
   const [cashOutVisible, setCashOutVisible] = useState(false);
   const [cashOutAmount, setCashOutAmount] = useState('100');
+  const [topUpVisible, setTopUpVisible] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState('100');
+  const [topUpError, setTopUpError] = useState('');
+  const [bankVisible, setBankVisible] = useState(false);
+  const [bankHolder, setBankHolder] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [bankNumber, setBankNumber] = useState('');
+  const [bankType, setBankType] = useState<BankAccount['accountType']>('Savings');
+  const [bankError, setBankError] = useState('');
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [cashOutError, setCashOutError] = useState('');
   const [splashAcknowledged, setSplashAcknowledged] = useState(false);
   const colors = useColors();
-  const { cashOut, merchantBalance } = useWallet();
+  const { cashOut, topUp, setupBankAccount, merchantBalance, bankAccount } = useWallet();
 
   const handleCashOutPinConfirm = (pin: string) => {
     if (cashOut(Number(cashOutAmount), pin)) {
@@ -1336,6 +1418,41 @@ export default function PaymerchHome() {
       setCashOutError('Invalid PIN. Please try again.');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
+  };
+
+  const handleTopUpPinConfirm = (pin: string) => {
+    if (topUp(Number(topUpAmount), pin)) {
+      setTopUpVisible(false);
+      setPinModalVisible(false);
+      setTopUpError('');
+    } else {
+      setTopUpError('Invalid PIN. Please try again.');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
+  const openBankSetup = () => {
+    setBankHolder(bankAccount?.accountHolder ?? '');
+    setBankName(bankAccount?.bankName ?? '');
+    setBankNumber(bankAccount?.accountNumber ?? '');
+    setBankType(bankAccount?.accountType ?? 'Savings');
+    setBankError('');
+    setBankVisible(true);
+  };
+
+  const saveBankAccount = () => {
+    if (!bankHolder.trim() || !bankName.trim() || bankNumber.replace(/\s/g, '').length < 6) {
+      setBankError('Enter the account holder, bank, and a valid account number.');
+      return;
+    }
+    setupBankAccount({
+      accountHolder: bankHolder.trim(),
+      bankName: bankName.trim(),
+      accountNumber: bankNumber.replace(/\s/g, ''),
+      accountType: bankType,
+    });
+    setBankVisible(false);
+    setBankError('');
   };
 
   if (!splashAcknowledged || !ready) return <AppSplashScreen onContinue={() => setSplashAcknowledged(true)} />;
@@ -1351,8 +1468,9 @@ export default function PaymerchHome() {
     if (screen === 'scan') return <ScanScreen onBack={() => navigate('home')} onNavigate={navigate} />;
     if (screen === 'vas') return <VasScreen onBack={() => navigate('home')} />;
     if (screen === 'activity') return <ActivityScreen onBack={() => navigate('home')} />;
-    if (screen === 'settings') return <SettingsScreen onBack={() => navigate('home')} />;
-    return <HomeScreen onNavigate={navigate} onOpenCashOut={() => setCashOutVisible(true)} />;
+    const openTopUp = () => { if (bankAccount) setTopUpVisible(true); else openBankSetup(); };
+    if (screen === 'settings') return <SettingsScreen onBack={() => navigate('home')} onOpenBankSetup={openBankSetup} onOpenTopUp={openTopUp} />;
+    return <HomeScreen onNavigate={navigate} onOpenCashOut={() => { if (bankAccount) setCashOutVisible(true); else openBankSetup(); }} onOpenTopUp={openTopUp} />;
   };
 
   const mainContent = (
@@ -1371,6 +1489,7 @@ export default function PaymerchHome() {
             </View>
             <Text style={[styles.formLabel, { color: colors.foreground }]}>AMOUNT</Text>
             <TextInput value={cashOutAmount} onChangeText={setCashOutAmount} keyboardType="decimal-pad" style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+            <Text style={[styles.modalHint, { color: colors.mutedForeground }]}>Funds will be sent to {bankAccount?.bankName} · •••• {bankAccount?.accountNumber.slice(-4)}.</Text>
             <HapticPressable
               onPress={() => {
                 setPinModalVisible(true);
@@ -1384,13 +1503,68 @@ export default function PaymerchHome() {
           </View>
         </View>
       </Modal>
+      <Modal visible={topUpVisible} transparent animationType="slide" onRequestClose={() => setTopUpVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.cashOutModal, { backgroundColor: colors.card }]}>
+            <View style={styles.qrModalHeader}>
+              <View>
+                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>BANK TRANSFER</Text>
+                <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>Top up wallet</Text>
+              </View>
+              <HapticPressable onPress={() => setTopUpVisible(false)} style={styles.closeButton}><Feather name="x" size={20} color={colors.foreground} /></HapticPressable>
+            </View>
+            <Text style={[styles.modalHint, { color: colors.mutedForeground }]}>Add funds from your linked bank account. This is a local demo transaction.</Text>
+            <Text style={[styles.formLabel, { color: colors.foreground }]}>AMOUNT</Text>
+            <TextInput value={topUpAmount} onChangeText={setTopUpAmount} keyboardType="decimal-pad" style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+            <HapticPressable onPress={() => { setTopUpError(''); setPinModalVisible(true); }} disabled={Number(topUpAmount) <= 0} style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 18 }]}>
+              <Feather name="upload" size={18} color={colors.buttonForeground} />
+              <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Confirm top up</Text>
+            </HapticPressable>
+          </View>
+        </View>
+      </Modal>
+      <Modal visible={bankVisible} transparent animationType="slide" onRequestClose={() => setBankVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <ScrollView contentContainerStyle={styles.modalScrollContent}>
+            <View style={[styles.cashOutModal, { backgroundColor: colors.card }]}>
+              <View style={styles.qrModalHeader}>
+                <View>
+                  <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>PAYOUT ACCOUNT</Text>
+                  <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>Set up bank account</Text>
+                </View>
+                <HapticPressable onPress={() => setBankVisible(false)} style={styles.closeButton}><Feather name="x" size={20} color={colors.foreground} /></HapticPressable>
+              </View>
+              <Text style={[styles.modalHint, { color: colors.mutedForeground }]}>Your account details are stored securely on this device for the prototype.</Text>
+              <Text style={[styles.formLabel, { color: colors.foreground }]}>ACCOUNT HOLDER</Text>
+              <TextInput value={bankHolder} onChangeText={setBankHolder} placeholder="Full name or business name" placeholderTextColor={colors.mutedForeground} style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+              <Text style={[styles.formLabel, { color: colors.foreground }]}>BANK</Text>
+              <TextInput value={bankName} onChangeText={setBankName} placeholder="e.g. Capitec, FNB, Absa" placeholderTextColor={colors.mutedForeground} style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+              <Text style={[styles.formLabel, { color: colors.foreground }]}>ACCOUNT NUMBER</Text>
+              <TextInput value={bankNumber} onChangeText={setBankNumber} keyboardType="number-pad" placeholder="Enter account number" placeholderTextColor={colors.mutedForeground} style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+              <Text style={[styles.formLabel, { color: colors.foreground }]}>ACCOUNT TYPE</Text>
+              <View style={styles.accountTypeRow}>
+                {(['Savings', 'Cheque'] as const).map((type) => (
+                  <HapticPressable key={type} onPress={() => setBankType(type)} style={[styles.accountTypeOption, { backgroundColor: bankType === type ? colors.foreground : colors.muted, borderColor: colors.border }]}>
+                    <Text style={[styles.accountTypeText, { color: bankType === type ? colors.primaryForeground : colors.foreground }]}>{type}</Text>
+                  </HapticPressable>
+                ))}
+              </View>
+              {bankError ? <Text style={[styles.errorText, { color: colors.destructive }]}>{bankError}</Text> : null}
+              <HapticPressable onPress={saveBankAccount} style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 18 }]}>
+                <Feather name="check" size={18} color={colors.buttonForeground} />
+                <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Save bank details</Text>
+              </HapticPressable>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
       <PinConfirmationModal
         visible={pinModalVisible}
-        onConfirm={handleCashOutPinConfirm}
+        onConfirm={topUpVisible ? handleTopUpPinConfirm : handleCashOutPinConfirm}
         onCancel={() => setPinModalVisible(false)}
-        title="Confirm Cash Out"
-        error={cashOutError}
-        onClearError={() => setCashOutError('')}
+        title={topUpVisible ? 'Confirm Wallet Top Up' : 'Confirm Cash Out'}
+        error={topUpVisible ? topUpError : cashOutError}
+        onClearError={() => topUpVisible ? setTopUpError('') : setCashOutError('')}
       />
     </View>
   );
@@ -1517,6 +1691,7 @@ const styles = StyleSheet.create({
   pressed: { opacity: 0.72 },
   disabled: { opacity: 0.35 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.58)', justifyContent: 'flex-end' },
+  modalScrollContent: { flexGrow: 1, justifyContent: 'flex-end' },
   qrModal: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, alignItems: 'center', minHeight: 500 },
   qrModalHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   qrModalTitle: { fontFamily: 'Inter_700Bold', fontSize: 30, marginTop: 4 },
@@ -1544,6 +1719,11 @@ const styles = StyleSheet.create({
   scannerCopy: { alignItems: 'center', marginTop: 34 },
   scannerHint: { fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', fontSize: 16 },
   scannerSubhint: { fontFamily: 'Inter_400Regular', color: '#999999', fontSize: 12, marginTop: 8, textAlign: 'center' },
+  paymentDetailsCard: { backgroundColor: '#FFFFFF', borderRadius: 18, padding: 14, marginTop: 20 },
+  paymentDetailsTitle: { fontFamily: 'Inter_700Bold', color: '#0A0A0A', fontSize: 14 },
+  paymentDetailsHint: { fontFamily: 'Inter_400Regular', color: '#686868', fontSize: 11, lineHeight: 16, marginTop: 4, marginBottom: 10 },
+  scannerInput: { backgroundColor: '#F5F5F2', borderRadius: 11, minHeight: 43, paddingHorizontal: 12, marginTop: 8, color: '#0A0A0A', fontFamily: 'Inter_400Regular', fontSize: 13 },
+  scannerError: { color: '#B42318', fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 8 },
   scanDemoButton: { minHeight: 54, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, marginTop: 'auto' },
   scanDemoText: { fontFamily: 'Inter_700Bold', fontSize: 14 },
   scannerFootnote: { fontFamily: 'Inter_400Regular', color: '#777777', textAlign: 'center', fontSize: 11, marginTop: 12 },
@@ -1577,6 +1757,10 @@ const styles = StyleSheet.create({
   navIcon: { width: 31, height: 26, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   navLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 10 },
   cashOutModal: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, minHeight: 280 },
+  modalHint: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, marginBottom: 18 },
+  accountTypeRow: { flexDirection: 'row', gap: 9 },
+  accountTypeOption: { flex: 1, minHeight: 48, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  accountTypeText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   settingsProfile: { borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28 },
   profileInitials: { width: 48, height: 48, borderRadius: 17, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   profileInitialText: { fontFamily: 'Inter_700Bold', color: '#0A0A0A', fontSize: 16 },
@@ -1595,6 +1779,10 @@ const styles = StyleSheet.create({
   settingCopy: { flex: 1 },
   settingTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   settingSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 },
+  smallAction: { borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 },
+  smallActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
+  secondaryAction: { minHeight: 43, borderRadius: 13, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 13 },
+  secondaryActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   toggle: { width: 42, height: 25, borderRadius: 20, padding: 3, justifyContent: 'center' },
   toggleThumb: { width: 19, height: 19, borderRadius: 10 },
   syncButton: { minHeight: 39, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 13 },

@@ -18,7 +18,16 @@
     "android": {},
     "web": {
       "favicon": "./assets/images/icon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static",
+      "name": "Paymerch Mobile",
+      "shortName": "Paymerch",
+      "lang": "en-ZA",
+      "description": "A local-first digital wallet for informal businesses.",
+      "themeColor": "#0A0A0A",
+      "backgroundColor": "#FBFBFA",
+      "display": "standalone",
+      "orientation": "portrait"
     },
     "experiments": {
       "typedRoutes": true,

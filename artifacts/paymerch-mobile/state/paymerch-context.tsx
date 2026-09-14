@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 export type TransactionStatus = 'SUCCESS' | 'PENDING SYNC' | 'FAILED';
-export type TransactionKind = 'MERCHANT_PAY' | 'VAS_ELEC' | 'VAS_AIRTIME' | 'CASH_OUT';
+export type TransactionKind = 'MERCHANT_PAY' | 'VAS_ELEC' | 'VAS_AIRTIME' | 'CASH_OUT' | 'TOP_UP';
 export type BusinessCategory =
   | 'Spaza shop'
   | 'Street vendor'
@@ -18,6 +18,13 @@ export type UserProfile = {
   name: string;
   phone: string;
   businessCategory?: BusinessCategory;
+};
+
+export type BankAccount = {
+  accountHolder: string;
+  bankName: string;
+  accountNumber: string;
+  accountType: 'Cheque' | 'Savings';
 };
 
 export type Transaction = {
@@ -47,6 +54,7 @@ type PersistedWallet = {
   businessCategory?: BusinessCategory;
   profile?: UserProfile;
   pin?: string;
+  bankAccount?: BankAccount;
 };
 
 type WalletContextValue = {
@@ -60,6 +68,7 @@ type WalletContextValue = {
   paymentRequest: PaymentRequest | null;
   businessCategory: BusinessCategory;
   profile: UserProfile;
+  bankAccount: BankAccount | null;
   login: (pin: string) => Promise<boolean>;
   biometricLogin: () => Promise<void>;
   registerAccount: (profile: UserProfile, pin: string) => Promise<void>;
@@ -67,9 +76,11 @@ type WalletContextValue = {
   toggleOnline: () => void;
   syncPending: () => void;
   createPaymentRequest: (amount: number, pin?: string) => PaymentRequest | null;
-  completePayment: (amount: number, source?: 'QR' | 'DEMO', pin?: string) => boolean;
+  completePayment: (amount: number, source?: 'QR' | 'DEMO', pin?: string, description?: string) => boolean;
   vendVas: (kind: 'VAS_ELEC' | 'VAS_AIRTIME', amount: number, destination: string, pin?: string) => string | null;
   cashOut: (amount: number, pin?: string) => boolean;
+  topUp: (amount: number, pin?: string) => boolean;
+  setupBankAccount: (account: BankAccount) => void;
   setBusinessCategory: (category: BusinessCategory) => void;
 };
 
@@ -150,6 +161,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [businessCategory, setBusinessCategory] = useState<BusinessCategory>('Spaza shop');
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [storedPin, setStoredPin] = useState<string | undefined>(undefined);
+  const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,6 +183,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           setBusinessCategory(wallet.businessCategory ?? 'Spaza shop');
           setProfile(wallet.profile ?? DEFAULT_PROFILE);
           setStoredPin(wallet.pin);
+          setBankAccount(wallet.bankAccount ?? null);
         } catch {
           await AsyncStorage.removeItem(STORAGE_KEY);
         }
@@ -196,9 +209,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       businessCategory,
       profile,
       pin: storedPin,
+      bankAccount: bankAccount ?? undefined,
     };
     void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(wallet));
-  }, [isRegistered, buyerBalance, merchantBalance, transactions, online, paymentRequest, businessCategory, profile, storedPin, ready]);
+  }, [isRegistered, buyerBalance, merchantBalance, transactions, online, paymentRequest, businessCategory, profile, storedPin, bankAccount, ready]);
 
   const login = useCallback(async (pin: string) => {
     // Check if user is registered
@@ -262,7 +276,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [storedPin]);
 
   const completePayment = useCallback(
-    (amount: number, source: 'QR' | 'DEMO' = 'QR', pin?: string): boolean => {
+    (amount: number, source: 'QR' | 'DEMO' = 'QR', pin?: string, description?: string): boolean => {
       // Require PIN verification for transactions
       if (pin && pin !== storedPin) {
         return false;
@@ -272,7 +286,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       const transaction: Transaction = {
         id: makeId(),
         kind: 'MERCHANT_PAY',
-        title: source === 'QR' ? 'Customer payment' : 'Demo customer payment',
+        title: description?.trim() || (source === 'QR' ? 'Customer payment' : 'Demo customer payment'),
         subtitle: online ? 'QR payment · Just now' : 'QR payment · Saved offline',
         amount: safeAmount,
         status: online ? 'SUCCESS' : 'PENDING SYNC',
@@ -323,7 +337,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
       const safeAmount = Math.round(amount * 100) / 100;
-      if (safeAmount <= 0 || safeAmount > merchantBalance) return false;
+      if (!bankAccount || safeAmount <= 0 || safeAmount > merchantBalance) return false;
       const transaction: Transaction = {
         id: makeId(),
         kind: 'CASH_OUT',
@@ -338,8 +352,34 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       setTransactions((current) => [transaction, ...current]);
       return true;
     },
-    [merchantBalance, online, storedPin],
+    [bankAccount, merchantBalance, online, storedPin],
   );
+
+  const topUp = useCallback(
+    (amount: number, pin?: string) => {
+      if (pin && pin !== storedPin) return false;
+      const safeAmount = Math.round(amount * 100) / 100;
+      if (safeAmount <= 0) return false;
+      const transaction: Transaction = {
+        id: makeId(),
+        kind: 'TOP_UP',
+        title: 'Wallet top up',
+        subtitle: online ? 'Bank transfer · Just now' : 'Bank transfer · Saved offline',
+        amount: safeAmount,
+        status: online ? 'SUCCESS' : 'PENDING SYNC',
+        createdAt: Date.now(),
+        direction: 'in',
+      };
+      setMerchantBalance((value) => Math.round((value + safeAmount) * 100) / 100);
+      setTransactions((current) => [transaction, ...current]);
+      return true;
+    },
+    [online, storedPin],
+  );
+
+  const setupBankAccount = useCallback((account: BankAccount) => {
+    setBankAccount(account);
+  }, []);
 
   const updateBusinessCategory = useCallback((category: BusinessCategory) => {
     setBusinessCategory(category);
@@ -362,6 +402,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       paymentRequest,
       businessCategory,
       profile,
+      bankAccount,
       login,
       biometricLogin,
       registerAccount,
@@ -372,6 +413,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       completePayment,
       vendVas,
       cashOut,
+      topUp,
+      setupBankAccount,
       setBusinessCategory: updateBusinessCategory,
     }),
     [
@@ -385,6 +428,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       paymentRequest,
       businessCategory,
       profile,
+      bankAccount,
       login,
       biometricLogin,
       registerAccount,
@@ -395,6 +439,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       completePayment,
       vendVas,
       cashOut,
+      topUp,
+      setupBankAccount,
       updateBusinessCategory,
     ],
   );
