@@ -509,12 +509,14 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
         <BrandMark size={42} />
         <View style={{ width: 42 }} />
       </View>
-      <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>FIRST TIME SETUP</Text>
-      <Text style={[styles.registrationTitle, { color: colors.foreground }]}>Create your wallet</Text>
-      <Text style={[styles.registrationSubtitle, { color: colors.mutedForeground }]}>
-        Set up your account and PIN for secure transactions.
-      </Text>
-      <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 25 }]}>I AM REGISTERING AS</Text>
+      <View style={styles.authBody}>
+        <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>FIRST TIME SETUP</Text>
+        <Text style={[styles.registrationTitle, { color: colors.foreground }]}>Create your wallet</Text>
+        <Text style={[styles.registrationSubtitle, { color: colors.mutedForeground }]}>
+          Set up your account and PIN for secure transactions.
+        </Text>
+      </View>
+      <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 25, textAlign: 'center' }]}>I AM REGISTERING AS</Text>
       <View style={[styles.segmented, { backgroundColor: colors.muted }]}>
         {(['business', 'individual'] as AccountType[]).map((type) => {
           const selected = accountType === type;
@@ -1439,9 +1441,9 @@ const styles = StyleSheet.create({
   brandName: { fontFamily: 'Inter_700Bold', fontSize: 16, letterSpacing: 3.4, textAlign: 'center' },
   tagline: { fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center' },
   authBody: { alignItems: 'center', width: '100%', marginTop: 20 },
-  authEyebrow: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.6 },
-  authTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8 },
-  authSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 9 },
+  authEyebrow: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.6, textAlign: 'center' },
+  authTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8, textAlign: 'center' },
+  authSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 9, textAlign: 'center' },
   pinDots: { flexDirection: 'row', gap: 12, marginTop: 28, marginBottom: 14 },
   pinDot: { width: 10, height: 10, borderRadius: 5 },
   errorText: { fontFamily: 'Inter_500Medium', fontSize: 12, textAlign: 'center', marginTop: 7, maxWidth: 290 },
@@ -1449,8 +1451,8 @@ const styles = StyleSheet.create({
   registerLinkText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
   registrationRoot: { paddingHorizontal: 18 },
   registrationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-  registrationTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8 },
-  registrationSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 20, marginTop: 9, maxWidth: 330 },
+  registrationTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8, textAlign: 'center' },
+  registrationSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 20, marginTop: 9, maxWidth: 330, textAlign: 'center' },
   registrationPinRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
   registrationPinField: { flex: 1 },
   registrationNote: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 13, paddingHorizontal: 18 },
@@ -1569,10 +1571,10 @@ const styles = StyleSheet.create({
   successSubtitle: { fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20, fontSize: 14, marginTop: 10, maxWidth: 300 },
   textButton: { padding: 15, marginTop: 6 },
   textButtonLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  segmented: { borderRadius: 15, padding: 4, flexDirection: 'row', marginBottom: 27 },
+  segmented: { borderRadius: 15, padding: 4, flexDirection: 'row', marginBottom: 27, alignSelf: 'center' },
   segment: { flex: 1, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', paddingVertical: 11, borderRadius: 12 },
   segmentText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  formLabel: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.2, marginBottom: 9 },
+  formLabel: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.2, marginBottom: 9, textAlign: 'center' },
   textInput: { borderWidth: 1, borderRadius: 15, minHeight: 53, paddingHorizontal: 15, fontFamily: 'Inter_400Regular', fontSize: 14 },
   vasAmountHeader: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
   balanceHint: { fontFamily: 'Inter_400Regular', fontSize: 12 },
