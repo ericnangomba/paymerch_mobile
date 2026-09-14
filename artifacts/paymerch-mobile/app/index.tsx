@@ -600,9 +600,9 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
         </View>
       </View>
       {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
-      <HapticPressable onPress={() => void submit()} style={[styles.primaryButton, { backgroundColor: colors.foreground, marginTop: 22 }]}>
-        <Feather name="arrow-right" size={18} color={colors.primaryForeground} />
-        <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Create account</Text>
+      <HapticPressable onPress={() => void submit()} style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 22 }]}>
+        <Feather name="arrow-right" size={18} color={colors.buttonForeground} />
+        <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Create account</Text>
       </HapticPressable>
       <Text style={[styles.registrationNote, { color: colors.mutedForeground }]}>
         Your account details and PIN are stored on this device in this prototype.
@@ -738,14 +738,14 @@ function HomeScreen({
         onToggle={toggleOnline}
         label={profile.accountType === 'business' ? 'BUSINESS WALLET' : 'PERSONAL WALLET'}
       />
-      <HapticPressable onPress={() => onNavigate('scan')} style={[styles.scanCta, { backgroundColor: colors.foreground }]}>
+      <HapticPressable onPress={() => onNavigate('scan')} style={[styles.scanCta, { backgroundColor: colors.button }]}>
         <View>
-          <Text style={styles.scanCtaEyebrow}>GET PAID</Text>
-          <Text style={styles.scanCtaTitle}>Scan customer QR</Text>
-          <Text style={styles.scanCtaText}>Your customer shows a one-time QR. You scan once.</Text>
+          <Text style={[styles.scanCtaEyebrow, { color: colors.buttonForeground }]}>GET PAID</Text>
+          <Text style={[styles.scanCtaTitle, { color: colors.buttonForeground }]}>Scan customer QR</Text>
+          <Text style={[styles.scanCtaText, { color: colors.buttonForeground }]}>Your customer shows a one-time QR. You scan once.</Text>
         </View>
-        <View style={styles.scanCtaIcon}>
-          <Feather name="maximize" size={25} color={colors.foreground} />
+        <View style={[styles.scanCtaIcon, { backgroundColor: colors.buttonForeground }]}>
+          <Feather name="maximize" size={25} color={colors.button} />
         </View>
       </HapticPressable>
       <View style={styles.sectionHeader}>
@@ -911,10 +911,10 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         testID="generate-payment-qr"
         disabled={number <= 0 || number > buyerBalance}
         onPress={generate}
-        style={[styles.primaryButton, { backgroundColor: colors.foreground }]}
+        style={[styles.primaryButton, { backgroundColor: colors.button }]}
       >
-        <Feather name="maximize" size={18} color={colors.primaryForeground} />
-        <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Show QR to seller</Text>
+        <Feather name="maximize" size={18} color={colors.buttonForeground} />
+        <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Show QR to seller</Text>
       </HapticPressable>
       <Modal visible={qrVisible} transparent animationType="fade" onRequestClose={() => setQrVisible(false)}>
         <View style={styles.modalBackdrop}>
@@ -989,8 +989,8 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
           {result === 'success' ? 'The customer and business wallets are updated.' : 'This payment is encrypted on-device and will sync when you reconnect.'}
         </Text>
-        <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, { backgroundColor: colors.foreground }]}>
-          <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Back to dashboard</Text>
+        <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, { backgroundColor: colors.button }]}>
+          <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Back to dashboard</Text>
         </HapticPressable>
         <HapticPressable onPress={() => setResult('idle')} style={styles.textButton}>
           <Text style={[styles.textButtonLabel, { color: colors.foreground }]}>Scan another payment</Text>
@@ -1027,9 +1027,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           {hasRequest ? `${zar(paymentRequest?.amount ?? 35)} · Expires in 60 seconds` : 'The customer QR is single-use and signed.'}
         </Text>
       </View>
-      <HapticPressable onPress={scan} style={[styles.scanDemoButton, { backgroundColor: colors.card }]}>
-        <Feather name="camera" size={18} color={colors.foreground} />
-        <Text style={[styles.scanDemoText, { color: colors.foreground }]}>{hasRequest ? 'Collect customer payment' : 'Use demo payment · R35'}</Text>
+      <HapticPressable onPress={scan} style={[styles.scanDemoButton, { backgroundColor: colors.button }]}>
+        <Feather name="camera" size={18} color={colors.buttonForeground} />
+        <Text style={[styles.scanDemoText, { color: colors.buttonForeground }]}>{hasRequest ? 'Collect customer payment' : 'Use demo payment · R35'}</Text>
       </HapticPressable>
       <Text style={styles.scannerFootnote}>Camera access is simulated in this prototype</Text>
       <PinConfirmationModal
@@ -1118,8 +1118,8 @@ function VasScreen({ onBack }: { onBack: () => void }) {
               <Text style={[styles.tokenCaption, { color: colors.mutedForeground }]}>AIRTIME VALUE</Text>
             </View>
           )}
-          <HapticPressable onPress={() => setToken(null)} style={[styles.primaryButton, { backgroundColor: colors.foreground }]}>
-            <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Vend another</Text>
+          <HapticPressable onPress={() => setToken(null)} style={[styles.primaryButton, { backgroundColor: colors.button }]}>
+            <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Vend another</Text>
           </HapticPressable>
         </View>
       </View>
@@ -1169,9 +1169,9 @@ function VasScreen({ onBack }: { onBack: () => void }) {
         ))}
       </View>
       {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
-      <HapticPressable onPress={vend} style={[styles.primaryButton, { backgroundColor: colors.foreground, marginTop: 28 }]}>
-        <Feather name="zap" size={18} color={colors.primaryForeground} />
-        <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Generate {kind === 'VAS_ELEC' ? 'electricity token' : 'airtime'}</Text>
+      <HapticPressable onPress={vend} style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 28 }]}>
+        <Feather name="zap" size={18} color={colors.buttonForeground} />
+        <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Generate {kind === 'VAS_ELEC' ? 'electricity token' : 'airtime'}</Text>
       </HapticPressable>
       <View style={[styles.infoBanner, { backgroundColor: colors.accent }]}>
         <Feather name="info" size={16} color={colors.accentForeground} />
@@ -1394,10 +1394,10 @@ export default function PaymerchHome() {
                 setPinModalVisible(true);
               }}
               disabled={Number(cashOutAmount) <= 0 || Number(cashOutAmount) > merchantBalance}
-              style={[styles.primaryButton, { backgroundColor: colors.foreground, marginTop: 18 }]}
+              style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 18 }]}
             >
-              <Feather name="download" size={18} color={colors.primaryForeground} />
-              <Text style={[styles.primaryButtonText, { color: colors.primaryForeground }]}>Confirm cash out</Text>
+              <Feather name="download" size={18} color={colors.buttonForeground} />
+              <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Confirm cash out</Text>
             </HapticPressable>
           </View>
         </View>
@@ -1487,10 +1487,10 @@ const styles = StyleSheet.create({
   pinModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   pinModalTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, marginTop: 4 },
   scanCta: { borderRadius: 22, minHeight: 112, padding: 18, marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  scanCtaEyebrow: { fontFamily: 'Inter_700Bold', color: '#A7A7A7', fontSize: 10, letterSpacing: 1.1 },
-  scanCtaTitle: { fontFamily: 'Inter_700Bold', color: '#FFFFFF', fontSize: 22, marginTop: 6 },
-  scanCtaText: { fontFamily: 'Inter_400Regular', color: '#B8B8B8', fontSize: 12, marginTop: 4 },
-  scanCtaIcon: { width: 56, height: 56, borderRadius: 18, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  scanCtaEyebrow: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.1 },
+  scanCtaTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, marginTop: 6 },
+  scanCtaText: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 4 },
+  scanCtaIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 11 },
   sectionTitle: { fontFamily: 'Inter_700Bold', fontSize: 16 },
   sectionHint: { fontFamily: 'Inter_400Regular', fontSize: 12 },
