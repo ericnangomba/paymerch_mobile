@@ -435,9 +435,9 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
       </View>
       <Animated.View style={{ opacity: buttonOpacity, transform: [{ translateY: buttonTranslateY }] }}>
         <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-          <HapticPressable onPress={onContinue} style={[styles.splashAction, { backgroundColor: colors.foreground }]}>
-            <Text style={[styles.splashActionText, { color: colors.primaryForeground }]}>Get started</Text>
-            <Feather name="arrow-right" size={16} color={colors.primaryForeground} />
+          <HapticPressable onPress={onContinue} style={[styles.splashAction, { backgroundColor: colors.button }]}>
+            <Text style={[styles.splashActionText, { color: colors.buttonForeground }]}>Get started</Text>
+            <Feather name="arrow-right" size={16} color={colors.buttonForeground} />
           </HapticPressable>
         </Animated.View>
       </Animated.View>
