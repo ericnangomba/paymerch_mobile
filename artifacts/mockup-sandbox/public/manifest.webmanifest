@@ -1,0 +1,19 @@
+{
+  "name": "Paymerch Mobile Prototype",
+  "short_name": "Paymerch",
+  "description": "Paymerch Mobile Prototype UI mockup sandbox",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#0b6e72",
+  "icons": [
+    {
+      "src": "/paymerch-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
