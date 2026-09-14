@@ -30,7 +30,7 @@ const businessCategories: BusinessCategory[] = [
   'Mini bus taxi',
 ];
 
-const logo = require('../assets/images/paymerch-icon.png');
+const logo = require('../assets/images/paymerchlogo.png');
 
 const zar = (amount: number) =>
   `R${amount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -80,7 +80,7 @@ function HapticPressable({
 }
 
 function BrandMark({ size = 42 }: { size?: number }) {
-  return <Image source={logo} style={{ width: size, height: size, borderRadius: size * 0.28 }} />;
+  return <Image source={logo} style={{ width: size * 2, height: size * 2 }} />;
 }
 
 function StatusPill({ online, colors }: { online: boolean; colors: ReturnType<typeof useColors> }) {
@@ -286,7 +286,7 @@ function AuthScreen() {
   const authContent = (
     <View style={[styles.authRoot, { backgroundColor: colors.background }]}>
       <View style={styles.authTop}>
-        <BrandMark size={58} />
+        <BrandMark size={40} />
         <Text style={[styles.brandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
         <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Simply Secure Payments</Text>
       </View>
@@ -426,7 +426,7 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
     <View style={[styles.splashRoot, { backgroundColor: colors.background }]}>
       <View style={styles.splashCenter}>
         <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
-          <BrandMark size={86} />
+          <BrandMark size={60} />
         </Animated.View>
         <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textTranslateY }] }}>
           <Text style={[styles.splashBrandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
@@ -506,7 +506,7 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
         <HapticPressable onPress={onBack} style={styles.backButton}>
           <Feather name="arrow-left" size={21} color={colors.foreground} />
         </HapticPressable>
-        <BrandMark size={42} />
+        <BrandMark size={30} />
         <View style={{ width: 42 }} />
       </View>
       <View style={styles.authBody}>
@@ -553,9 +553,9 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
                 <HapticPressable
                   key={item}
                   onPress={() => setCategory(item)}
-                  style={[styles.categoryChip, { backgroundColor: selected ? colors.foreground : colors.card, borderColor: selected ? colors.foreground : colors.border }]}
+                  style={[styles.categoryChip, { backgroundColor: selected ? colors.active : colors.card, borderColor: selected ? colors.active : colors.border }]}
                 >
-                  <Text style={[styles.categoryChipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{item}</Text>
+                  <Text style={[styles.categoryChipText, { color: selected ? colors.activeForeground : colors.foreground }]}>{item}</Text>
                 </HapticPressable>
               );
             })}
@@ -626,7 +626,7 @@ function Header({
   return (
     <View style={styles.header}>
       <View style={styles.headerIdentity}>
-        <BrandMark size={42} />
+        <BrandMark size={30} />
         <View>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>{title}</Text>
           <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
@@ -1250,9 +1250,9 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
                   <HapticPressable
                     key={category}
                     onPress={() => setBusinessCategory(category)}
-                    style={[styles.categoryChip, { backgroundColor: selected ? colors.foreground : colors.muted, borderColor: selected ? colors.foreground : colors.border }]}
+                    style={[styles.categoryChip, { backgroundColor: selected ? colors.active : colors.muted, borderColor: selected ? colors.active : colors.border }]}
                   >
-                    <Text style={[styles.categoryChipText, { color: selected ? colors.primaryForeground : colors.foreground }]}>{category}</Text>
+                    <Text style={[styles.categoryChipText, { color: selected ? colors.activeForeground : colors.foreground }]}>{category}</Text>
                   </HapticPressable>
                 );
               })}

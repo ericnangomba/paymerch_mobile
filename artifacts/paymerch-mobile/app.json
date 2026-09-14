@@ -4,9 +4,9 @@
     "slug": "paymerch-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/paymerch-icon.png",
+    "icon": "./assets/images/icon.png",
     "splash": {
-      "image": "./assets/images/paymerch-icon.png",
+      "image": "./assets/images/paymerchlogo.png",
       "resizeMode": "contain",
       "backgroundColor": "#FBFBFA"
     },
@@ -17,7 +17,7 @@
     },
     "android": {},
     "web": {
-      "favicon": "./assets/images/paymerch-icon.png",
+      "favicon": "./assets/images/icon.png",
       "bundler": "metro"
     },
     "experiments": {

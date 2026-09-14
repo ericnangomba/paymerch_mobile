@@ -16,5 +16,5 @@ import colors from '@/constants/colors';
 export function useColors() {
   const scheme = useColorScheme();
   const palette = scheme === 'dark' ? colors.dark : colors.light;
-  return { ...palette, radius: colors.radius, button: palette.button, buttonForeground: palette.buttonForeground };
+  return { ...palette, radius: colors.radius, button: palette.button, buttonForeground: palette.buttonForeground, active: palette.active, activeForeground: palette.activeForeground };
 }
