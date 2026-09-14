@@ -80,7 +80,7 @@ function HapticPressable({
 }
 
 function BrandMark({ size = 42 }: { size?: number }) {
-  return <Image source={logo} style={{ width: size * 2, height: size * 2 }} />;
+  return <Image source={logo} style={{ width: size * 2, height: size * 2 }} resizeMode="contain" />;
 }
 
 function StatusPill({ online, colors }: { online: boolean; colors: ReturnType<typeof useColors> }) {
@@ -426,7 +426,7 @@ function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
     <View style={[styles.splashRoot, { backgroundColor: colors.background }]}>
       <View style={styles.splashCenter}>
         <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
-          <BrandMark size={60} />
+          <BrandMark size={70} />
         </Animated.View>
         <Animated.View style={{ opacity: textOpacity, transform: [{ translateY: textTranslateY }] }}>
           <Text style={[styles.splashBrandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
@@ -1431,7 +1431,7 @@ const styles = StyleSheet.create({
   loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
   splashRoot: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 120, paddingBottom: 60 },
-  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, width: '100%' },
+  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, width: '100%', paddingHorizontal: 32 },
   splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8, textAlign: 'center' },
   splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center' },
   splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minWidth: 150, paddingHorizontal: 18, paddingVertical: 13, alignSelf: 'center' },
@@ -1571,7 +1571,7 @@ const styles = StyleSheet.create({
   successSubtitle: { fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20, fontSize: 14, marginTop: 10, maxWidth: 300 },
   textButton: { padding: 15, marginTop: 6 },
   textButtonLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  segmented: { borderRadius: 15, padding: 4, flexDirection: 'row', marginBottom: 27, alignSelf: 'center' },
+  segmented: { borderRadius: 15, padding: 4, flexDirection: 'row', marginBottom: 27, alignSelf: 'center', gap: 12 },
   segment: { flex: 1, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', paddingVertical: 11, borderRadius: 12 },
   segmentText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
   formLabel: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.2, marginBottom: 9, textAlign: 'center' },
