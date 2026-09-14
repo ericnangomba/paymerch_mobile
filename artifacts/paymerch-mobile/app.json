@@ -17,8 +17,12 @@
     },
     "android": {},
     "web": {
-      "favicon": "./assets/images/icon.png",
+      "favicon": "./assets/images/paymerch-icon.png",
       "bundler": "metro"
+    },
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
     },
     "plugins": [
       "expo-router",
@@ -28,10 +32,6 @@
           "faceIDPermission": "Allow Paymerch Mobile to use Face ID to unlock your wallet."
         }
       ]
-    ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
-    }
+    ]
   }
 }
