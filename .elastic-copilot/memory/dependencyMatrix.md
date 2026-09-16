@@ -1,33 +1,33 @@
 # Dependency Matrix
 
-*Generated: 2026-09-14T21:00:00.969Z*
+*Generated: 2026-09-16T07:57:51.138Z*
 
 ## Summary
 
-- Files analyzed: 105
+- Files analyzed: 106
 - File types: ts, tsx, js
 
 ## File Type Distribution
 
 - 37 ts files
 - 65 tsx files
-- 3 js files
+- 4 js files
 
 ## Key Dependencies by Type
 
 ### TS
 
 Top dependencies:
+- vite
+- @vitejs/plugin-react
+- @tailwindcss/vite
+- path
+- @replit/vite-plugin-runtime-error-modal
+- ./mockupPreviewPlugin
 - drizzle-orm/pg-core
 - drizzle-zod
 - zod/v4
 - drizzle-orm/node-postgres
-- pg
-- ./schema
-- expo-router
-- vite
-- @vitejs/plugin-react
-- @tailwindcss/vite
 
 ### TSX
 
@@ -37,11 +37,11 @@ Top dependencies:
 - react-dom/client
 - ./App
 - ./index.css
-- @radix-ui/react-tooltip
-- @/lib/utils
-- @radix-ui/react-toggle
-- class-variance-authority
-- @radix-ui/react-toggle-group
+- react-native
+- react-native-safe-area-context
+- @/hooks/useColors
+- @expo/vector-icons
+- expo
 
 ### JS
 
