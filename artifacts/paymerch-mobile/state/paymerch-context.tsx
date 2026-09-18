@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { Platform } from 'react-native';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 export type TransactionStatus = 'SUCCESS' | 'PENDING SYNC' | 'FAILED';
 export type TransactionKind = 'MERCHANT_PAY' | 'VAS_ELEC' | 'VAS_AIRTIME' | 'CASH_OUT';
@@ -37,6 +39,18 @@ export type PaymentRequest = {
   expiresAt: number;
 };
 
+/**
+ * Authentication supplied before a transaction is authorized.
+ *
+ * - `{ pin }` authorizes using the wallet's registered PIN (verified against the
+ *   on-device stored PIN).
+ * - `{ biometric: true }` authorizes using device biometrics. The caller is
+ *   responsible for running `verifyBiometrics()` before invoking the action, so
+ *   this branch trusts that a biometric challenge already succeeded.
+ */
+export type TransactionAuth = { pin: string } | { biometric: true };
+
+
 type PersistedWallet = {
   isRegistered: boolean;
   buyerBalance: number;
@@ -60,16 +74,19 @@ type WalletContextValue = {
   paymentRequest: PaymentRequest | null;
   businessCategory: BusinessCategory;
   profile: UserProfile;
+  biometricAvailable: boolean;
+  biometricLabel: string;
   login: (pin: string) => Promise<boolean>;
   biometricLogin: () => Promise<void>;
+  verifyBiometrics: () => Promise<boolean>;
   registerAccount: (profile: UserProfile, pin: string) => Promise<void>;
   logout: () => Promise<void>;
   toggleOnline: () => void;
   syncPending: () => void;
-  createPaymentRequest: (amount: number, pin?: string) => PaymentRequest | null;
-  completePayment: (amount: number, source?: 'QR' | 'DEMO', pin?: string) => boolean;
-  vendVas: (kind: 'VAS_ELEC' | 'VAS_AIRTIME', amount: number, destination: string, pin?: string) => string | null;
-  cashOut: (amount: number, pin?: string) => boolean;
+  createPaymentRequest: (amount: number, auth: TransactionAuth) => PaymentRequest | null;
+  completePayment: (amount: number, source?: 'QR' | 'DEMO', auth?: TransactionAuth) => boolean;
+  vendVas: (kind: 'VAS_ELEC' | 'VAS_AIRTIME', amount: number, destination: string, auth: TransactionAuth) => string | null;
+  cashOut: (amount: number, auth: TransactionAuth) => boolean;
   setBusinessCategory: (category: BusinessCategory) => void;
 };
 
@@ -150,6 +167,42 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [businessCategory, setBusinessCategory] = useState<BusinessCategory>('Spaza shop');
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [storedPin, setStoredPin] = useState<string | undefined>(undefined);
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricLabel, setBiometricLabel] = useState('Use biometrics');
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    let cancelled = false;
+    Promise.all([
+      LocalAuthentication.hasHardwareAsync(),
+      LocalAuthentication.isEnrolledAsync(),
+    ])
+      .then(([hasHardware, isEnrolled]) => ({ hasHardware, isEnrolled }))
+      .then((caps) => {
+        if (cancelled) return;
+        setBiometricAvailable(caps.hasHardware && caps.isEnrolled);
+        if (!caps.hasHardware || !caps.isEnrolled) return;
+        LocalAuthentication.supportedAuthenticationTypesAsync()
+          .then((types) => {
+            if (cancelled) return;
+            const label = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
+              ? 'Use Face ID'
+              : types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
+                ? 'Use fingerprint'
+                : 'Use biometrics';
+            setBiometricLabel(label);
+          })
+          .catch(() => {
+            /* Keep the generic label. */
+          });
+      })
+      .catch(() => {
+        /* Biometric support is optional; PIN remains a full fallback. */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,6 +271,38 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(SESSION_KEY, 'active');
   }, []);
 
+  /**
+   * Runs the device's biometric prompt (Face ID / Touch ID / fingerprint).
+   *
+   * Returns `false` on web, when no biometrics are enrolled, or when the user
+   * cancels / fails. Device fallback is disabled so biometrics are required —
+   * users who cannot authenticate with biometrics use their PIN instead.
+   */
+  const verifyBiometrics = useCallback(async (): Promise<boolean> => {
+    if (Platform.OS === 'web') return false;
+    if (!biometricAvailable) return false;
+    try {
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Paymerch Mobile',
+        fallbackLabel: 'Use PIN',
+        cancelLabel: 'Cancel',
+        disableDeviceFallback: true,
+      });
+      return result.success;
+    } catch {
+      return false;
+    }
+  }, [biometricAvailable]);
+
+  const authorize = useCallback(
+    (auth?: TransactionAuth): boolean => {
+      if (!auth) return false;
+      if ('biometric' in auth) return true;
+      return Boolean(storedPin) && auth.pin === storedPin;
+    },
+    [storedPin],
+  );
+
   const registerAccount = useCallback(async (nextProfile: UserProfile, pin: string) => {
     setProfile(nextProfile);
     setStoredPin(pin);
@@ -247,9 +332,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const createPaymentRequest = useCallback((amount: number, pin?: string): PaymentRequest | null => {
-    // Require PIN verification for payment request creation
-    if (pin && pin !== storedPin) {
+  const createPaymentRequest = useCallback((amount: number, auth: TransactionAuth): PaymentRequest | null => {
+    // Require PIN or biometric authorization for payment request creation
+    if (!authorize(auth)) {
       return null;
     }
     const request: PaymentRequest = {
@@ -262,9 +347,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [storedPin]);
 
   const completePayment = useCallback(
-    (amount: number, source: 'QR' | 'DEMO' = 'QR', pin?: string): boolean => {
-      // Require PIN verification for transactions
-      if (pin && pin !== storedPin) {
+    (amount: number, source: 'QR' | 'DEMO' = 'QR', auth?: TransactionAuth): boolean => {
+      // Require PIN or biometric authorization for transactions
+      if (!authorize(auth)) {
         return false;
       }
       const safeAmount = Math.round(amount * 100) / 100;
@@ -289,9 +374,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 
   const vendVas = useCallback(
-    (kind: 'VAS_ELEC' | 'VAS_AIRTIME', amount: number, destination: string, pin?: string): string | null => {
-      // Require PIN verification for transactions
-      if (pin && pin !== storedPin) {
+    (kind: 'VAS_ELEC' | 'VAS_AIRTIME', amount: number, destination: string, auth: TransactionAuth): string | null => {
+      // Require PIN or biometric authorization for transactions
+      if (!authorize(auth)) {
         return 'INVALID_PIN';
       }
       const safeAmount = Math.round(amount * 100) / 100;
@@ -317,9 +402,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 
   const cashOut = useCallback(
-    (amount: number, pin?: string) => {
-      // Require PIN verification for transactions
-      if (pin && pin !== storedPin) {
+    (amount: number, auth: TransactionAuth) => {
+      // Require PIN or biometric authorization for transactions
+      if (!authorize(auth)) {
         return false;
       }
       const safeAmount = Math.round(amount * 100) / 100;
@@ -362,8 +447,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       paymentRequest,
       businessCategory,
       profile,
+      biometricAvailable,
+      biometricLabel,
       login,
       biometricLogin,
+      verifyBiometrics,
       registerAccount,
       logout,
       toggleOnline,
@@ -385,8 +473,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       paymentRequest,
       businessCategory,
       profile,
+      biometricAvailable,
+      biometricLabel,
       login,
       biometricLogin,
+      verifyBiometrics,
       registerAccount,
       logout,
       toggleOnline,

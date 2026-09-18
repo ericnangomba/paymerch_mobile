@@ -4,7 +4,7 @@
     "slug": "paymerch-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/mlogo.png",
     "splash": {
       "image": "./assets/images/paymerchlogo.png",
       "resizeMode": "contain",
@@ -13,11 +13,14 @@
     "scheme": "paymerch-mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Paymerch Mobile needs the camera to scan customer QR payment codes."
+      }
     },
     "android": {},
     "web": {
-      "favicon": "./assets/images/icon.png",
+      "favicon": "./assets/images/favicon.png",
       "bundler": "metro"
     },
     "experiments": {

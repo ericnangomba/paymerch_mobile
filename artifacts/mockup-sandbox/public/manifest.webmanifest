@@ -10,6 +10,18 @@
   "theme_color": "#0b6e72",
   "icons": [
     {
+      "src": "/favicon.png",
+      "sizes": "64x64",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "64x64",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
       "src": "/paymerch-icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",

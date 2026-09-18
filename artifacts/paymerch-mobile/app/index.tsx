@@ -1,6 +1,6 @@
 import { Feather } from '@expo/vector-icons';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
-import * as LocalAuthentication from 'expo-local-authentication';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Animated,
@@ -15,8 +15,17 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import QRCodeSvg from 'react-native-qrcode-svg';
 import { useColors } from '@/hooks/useColors';
-import { AccountType, BusinessCategory, Transaction, UserProfile, PaymentRequest, useWallet } from '@/state/paymerch-context';
+import {
+  AccountType,
+  BusinessCategory,
+  Transaction,
+  TransactionAuth,
+  UserProfile,
+  PaymentRequest,
+  useWallet,
+} from '@/state/paymerch-context';
 
 type Screen = 'home' | 'pay' | 'scan' | 'vas' | 'activity' | 'settings';
 type IconName = React.ComponentProps<typeof Feather>['name'];
@@ -31,9 +40,53 @@ const businessCategories: BusinessCategory[] = [
 ];
 
 const logo = require('../assets/images/paymerchlogo.png');
+const logoMark = require('../assets/images/mlogo.png');
 
 const zar = (amount: number) =>
   `R${amount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Payload encoded into the customer's one-time payment QR. A production build
+ * would be a server-signed token (e.g. JWT); this local-first prototype encodes
+ * the token, amount and expiry as a URL-safe string so any QR scanner can read
+ * it and the merchant app can validate it against the local wallet state.
+ */
+type QrPayload = {
+  token: string;
+  amount: number;
+  expiresAt: number;
+  name: string;
+};
+
+const QR_PREFIX = 'PM1:';
+
+const encodeQrPayload = (payload: QrPayload): string =>
+  `${QR_PREFIX}${encodeURIComponent(JSON.stringify(payload))}`;
+
+const decodeQrPayload = (data: string): QrPayload | null => {
+  if (!data || !data.startsWith(QR_PREFIX)) return null;
+  try {
+    const obj = JSON.parse(decodeURIComponent(data.slice(QR_PREFIX.length)));
+    if (
+      obj &&
+      typeof obj.token === 'string' &&
+      typeof obj.amount === 'number' &&
+      typeof obj.expiresAt === 'number'
+    ) {
+      return obj as QrPayload;
+    }
+  } catch {
+    // Invalid QR content; handled by the caller.
+  }
+  return null;
+};
+
+const buildQrPayload = (request: PaymentRequest, name: string): QrPayload => ({
+  token: request.token,
+  amount: request.amount,
+  expiresAt: request.expiresAt,
+  name,
+});
 
 const timeLabel = (timestamp: number) => {
   const minutes = Math.max(1, Math.round((Date.now() - timestamp) / 60_000));
@@ -83,6 +136,11 @@ function BrandMark({ size = 42 }: { size?: number }) {
   return <Image source={logo} style={{ width: size * 2, height: size * 2 }} resizeMode="contain" />;
 }
 
+/** Small icon-only mark (the m-logo) used where the logo is tiny, e.g. the header. */
+function LogoIcon({ size = 40 }: { size?: number }) {
+  return <Image source={logoMark} style={{ width: size, height: size }} resizeMode="contain" />;
+}
+
 function StatusPill({ online, colors }: { online: boolean; colors: ReturnType<typeof useColors> }) {
   return (
     <View style={[styles.statusPill, { backgroundColor: online ? colors.accent : colors.warm }]}>
@@ -94,14 +152,37 @@ function StatusPill({ online, colors }: { online: boolean; colors: ReturnType<ty
   );
 }
 
-function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: externalError, onClearError }: { visible: boolean; onConfirm: (pin: string) => void; onCancel: () => void; title: string; error?: string; onClearError?: () => void }) {
+function PinConfirmationModal({
+  visible,
+  onConfirm,
+  onCancel,
+  canUseBiometric,
+  biometricLabel,
+  title,
+  error: externalError,
+  onClearError,
+}: {
+  visible: boolean;
+  onConfirm: (auth: TransactionAuth) => void;
+  onCancel: () => void;
+  canUseBiometric: boolean;
+  biometricLabel: string;
+  title: string;
+  error?: string;
+  onClearError?: () => void;
+}) {
   const colors = useColors();
+  const { verifyBiometrics } = useWallet();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
   // Use external error if provided
   const displayError = externalError || error;
+
+  const complete = (next: string) => {
+    onConfirm({ pin: next });
+  };
 
   const handleDigit = (digit: string) => {
     if (pin.length >= 6 || isProcessing) return;
@@ -111,11 +192,7 @@ function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: exte
     onClearError?.();
     if (next.length === 6) {
       setIsProcessing(true);
-      onConfirm(next);
-      // Parent component will handle success/failure and close modal
-      setTimeout(() => {
-        setIsProcessing(false);
-      }, 300);
+      complete(next);
     }
   };
 
@@ -124,6 +201,19 @@ function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: exte
     setPin((value) => value.slice(0, -1));
     setError('');
   };
+
+  const handleBiometric = async () => {
+    if (isProcessing) return;
+    setIsProcessing(true);
+    const success = await verifyBiometrics();
+    if (success) {
+      onConfirm({ biometric: true });
+    } else {
+      setError('Biometric authentication failed. Please use your PIN.');
+    }
+    setIsProcessing(false);
+  };
+
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
   // Reset state when modal opens/closes
@@ -134,6 +224,20 @@ function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: exte
       setIsProcessing(false);
     }
   }, [visible]);
+
+  const renderBiometricButton = canUseBiometric && (
+    <HapticPressable
+      onPress={() => {
+        void handleBiometric();
+      }}
+      style={[styles.pinKey, styles.pinKeyCircle, { backgroundColor: colors.card }]}
+    >
+      <Feather name="smartphone" size={21} color={colors.foreground} />
+      <Text style={[styles.pinKeyText, { color: colors.foreground, marginLeft: 8 }]}>
+        {biometricLabel}
+      </Text>
+    </HapticPressable>
+  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -147,7 +251,7 @@ function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: exte
             </HapticPressable>
           </View>
           <Text style={[styles.authSubtitle, { color: colors.mutedForeground }, { textAlign: 'center', marginTop: 10 }]}>
-            Enter your PIN to confirm this transaction
+            Enter your PIN or use biometrics to confirm this transaction
           </Text>
           <View style={styles.pinDots}>
             {[0, 1, 2, 3, 4, 5].map((index) => (
@@ -157,7 +261,7 @@ function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: exte
               />
             ))}
           </View>
-          {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
+          {displayError ? <Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text> : null}
           <View style={styles.pinPad}>
             {keys.map((key) => (
               <HapticPressable key={key} onPress={() => void handleDigit(key)} style={styles.pinKey}>
@@ -172,6 +276,7 @@ function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: exte
               <Feather name="delete" size={21} color={colors.foreground} />
             </HapticPressable>
           </View>
+          {renderBiometricButton}
         </View>
       </View>
     </Modal>
@@ -180,12 +285,11 @@ function PinConfirmationModal({ visible, onConfirm, onCancel, title, error: exte
 
 function AuthScreen() {
   const colors = useColors();
-  const { login, biometricLogin, isRegistered } = useWallet();
+  const { login, biometricLogin, isRegistered, biometricAvailable, biometricLabel, verifyBiometrics } = useWallet();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [registrationMessage, setRegistrationMessage] = useState('');
-  const [biometricLabel, setBiometricLabel] = useState('Use device unlock');
 
   // If not registered, show registration screen by default
   useEffect(() => {
@@ -194,60 +298,21 @@ function AuthScreen() {
     }
   }, [isRegistered]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadBiometricLabel = async () => {
-      if (Platform.OS === 'web') return;
-      try {
-        const [hasHardware, isEnrolled] = await Promise.all([
-          LocalAuthentication.hasHardwareAsync(),
-          LocalAuthentication.isEnrolledAsync(),
-        ]);
-        if (!hasHardware || !isEnrolled || cancelled) return;
-        const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-        const label = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)
-          ? 'Use Face ID'
-          : types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)
-            ? 'Use fingerprint'
-            : 'Use device unlock';
-        if (!cancelled) setBiometricLabel(label);
-      } catch {
-        // The PIN remains available when device authentication cannot be inspected.
-      }
-    };
-    void loadBiometricLabel();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const handleBiometricUnlock = async () => {
     setError('');
     if (Platform.OS === 'web') {
       setError('Biometrics are available on a physical device. Use your PIN in this preview.');
       return;
     }
-    try {
-      const [hasHardware, isEnrolled] = await Promise.all([
-        LocalAuthentication.hasHardwareAsync(),
-        LocalAuthentication.isEnrolledAsync(),
-      ]);
-      if (!hasHardware || !isEnrolled) {
-        setError('No enrolled biometrics were found. Use your 6-digit PIN instead.');
-        return;
-      }
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Unlock Paymerch Mobile',
-        cancelLabel: 'Use PIN',
-        fallbackLabel: 'Use PIN',
-      });
-      if (result.success) {
-        await biometricLogin();
-      } else if (result.error !== 'user_cancel' && result.error !== 'system_cancel') {
-        setError('Biometric unlock was not completed. Use your 6-digit PIN.');
-      }
-    } catch {
-      setError('Biometric unlock is unavailable. Use your 6-digit PIN.');
+    if (!biometricAvailable) {
+      setError('No enrolled biometrics were found. Use your 6-digit PIN instead.');
+      return;
+    }
+    const ok = await verifyBiometrics();
+    if (ok) {
+      await biometricLogin();
+    } else {
+      setError('Biometric unlock was not completed. Use your 6-digit PIN.');
     }
   };
 
@@ -322,11 +387,15 @@ function AuthScreen() {
             <Feather name="delete" size={21} color={colors.foreground} />
           </HapticPressable>
         </View>
-        <HapticPressable onPress={() => void handleBiometricUnlock()} style={styles.biometricButton}>
-          <Feather name="smartphone" size={17} color={colors.foreground} />
-          <Text style={[styles.biometricText, { color: colors.foreground }]}>{biometricLabel}</Text>
-        </HapticPressable>
-        <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>Enter your 6-digit PIN to unlock</Text>
+        {biometricAvailable ? (
+          <HapticPressable onPress={() => void handleBiometricUnlock()} style={styles.biometricButton}>
+            <Feather name="smartphone" size={17} color={colors.foreground} />
+            <Text style={[styles.biometricText, { color: colors.foreground }]}>{biometricLabel}</Text>
+          </HapticPressable>
+        ) : null}
+        <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>
+          {biometricAvailable ? 'Enter your 6-digit PIN to unlock' : 'Use your 6-digit PIN to unlock (enroll biometrics in device settings to enable this option)'}
+        </Text>
       </View>
       <Text style={[styles.secureFooter, { color: colors.mutedForeground }]}>
         <Feather name="shield" size={12} /> Your wallet is secured on this device
@@ -608,7 +677,7 @@ function Header({
   return (
     <View style={styles.header}>
       <View style={styles.headerIdentity}>
-        <BrandMark size={30} />
+         <LogoIcon size={44} />
         <View>
           <Text style={[styles.headerTitle, { color: colors.foreground }]}>{title}</Text>
           <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
@@ -781,31 +850,23 @@ function Keypad({ value, onDigit, onBackspace }: { value: string; onDigit: (digi
   );
 }
 
-function QRCode({ seed }: { seed: string }) {
+function QRCode({ payload }: { payload: QrPayload }) {
   const colors = useColors();
-  const size = 21;
-  const cells = useMemo(() => {
-    const hash = Array.from(seed).reduce((total, char, index) => total + char.charCodeAt(0) * (index + 1), 0);
-    return Array.from({ length: size * size }, (_, index) => {
-      const row = Math.floor(index / size);
-      const col = index % size;
-      const finder = (startRow: number, startCol: number) => {
-        const r = row - startRow;
-        const c = col - startCol;
-        if (r < 0 || r > 6 || c < 0 || c > 6) return false;
-        return r === 0 || r === 6 || c === 0 || c === 6 || (r >= 2 && r <= 4 && c >= 2 && c <= 4);
-      };
-      if (finder(0, 0) || finder(0, 14) || finder(14, 0)) return true;
-      return (hash + row * 17 + col * 31 + row * col) % 7 < 3;
-    });
-  }, [seed]);
+  const value = encodeQrPayload(payload);
   return (
     <View style={[styles.qrFrame, { backgroundColor: '#FFFFFF', borderColor: colors.border }]}>
-      <View style={styles.qrGrid}>
-        {cells.map((active, index) => (
-          <View key={index} style={[styles.qrCell, { backgroundColor: active ? '#0A0A0A' : '#FFFFFF' }]} />
-        ))}
-      </View>
+      <QRCodeSvg
+        value={value}
+        size={210}
+        color="#0A0A0A"
+        backgroundColor="#FFFFFF"
+        quietZone={6}
+        ecl="M"
+        logo={logoMark}
+        logoSize={36}
+        logoBackgroundColor="#FFFFFF"
+        logoBorderRadius={8}
+      />
     </View>
   );
 }
@@ -813,7 +874,7 @@ function QRCode({ seed }: { seed: string }) {
 function PayScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buyerBalance, createPaymentRequest, paymentRequest, completePayment } = useWallet();
+  const { buyerBalance, createPaymentRequest, paymentRequest, completePayment, profile, biometricAvailable, biometricLabel } = useWallet();
   const [amount, setAmount] = useState('');
   const [qrVisible, setQrVisible] = useState(false);
   const [seconds, setSeconds] = useState(60);
@@ -839,8 +900,8 @@ function PayScreen({ onBack }: { onBack: () => void }) {
     setPinModalVisible(true);
   };
 
-  const handlePinConfirm = (pin: string) => {
-    const request = createPaymentRequest(pendingAmount, pin);
+  const handlePinConfirm = (auth: TransactionAuth) => {
+    const request = createPaymentRequest(pendingAmount, auth);
     if (request !== null) {
       setLocalPaymentRequest(request);
       setSeconds(60);
@@ -852,6 +913,11 @@ function PayScreen({ onBack }: { onBack: () => void }) {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
+
+  const activeRequest = localPaymentRequest ?? paymentRequest;
+  const qrPayload: QrPayload | null = activeRequest
+    ? buildQrPayload(activeRequest, profile.name)
+    : null;
 
   return (
     <View style={[styles.screenRoot, { backgroundColor: colors.background, paddingTop: insets.top + 18, paddingBottom: 34 }]}>
@@ -904,26 +970,34 @@ function PayScreen({ onBack }: { onBack: () => void }) {
             <View style={styles.qrModalHeader}>
               <View>
                 <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>PAYMENT REQUEST</Text>
-                <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>{zar(localPaymentRequest?.amount ?? paymentRequest?.amount ?? number)}</Text>
+                <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>{zar(activeRequest?.amount ?? number)}</Text>
               </View>
               <HapticPressable onPress={() => setQrVisible(false)} style={styles.closeButton}>
                 <Feather name="x" size={20} color={colors.foreground} />
               </HapticPressable>
             </View>
-            <QRCode seed={localPaymentRequest?.token ?? paymentRequest?.token ?? 'paymerch-demo'} />
+            {qrPayload ? (
+              <QRCode payload={qrPayload} />
+            ) : (
+              <View style={[styles.qrFrame, { backgroundColor: colors.card, borderColor: colors.border, alignItems: 'center', justifyContent: 'center', height: 218 }]}>
+                <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>No request generated</Text>
+              </View>
+            )}
             <View style={[styles.timerPill, { backgroundColor: colors.warm }]}>
               <Feather name="clock" size={15} color={colors.warning} />
               <Text style={[styles.timerText, { color: colors.warning }]}>{seconds}s remaining</Text>
             </View>
             <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>Show this code to the seller. It can only be used once.</Text>
-            <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{localPaymentRequest?.token ?? paymentRequest?.token ?? 'tok_demo_pm'}</Text>
+            <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{activeRequest?.token ?? 'tok_demo_pm'}</Text>
           </View>
         </View>
       </Modal>
-      <PinConfirmationModal
+       <PinConfirmationModal
         visible={pinModalVisible}
         onConfirm={handlePinConfirm}
         onCancel={() => setPinModalVisible(false)}
+        canUseBiometric={biometricAvailable}
+        biometricLabel={biometricLabel}
         title="Confirm Payment"
         error={pinError}
         onClearError={() => setPinError('')}
@@ -935,26 +1009,86 @@ function PayScreen({ onBack }: { onBack: () => void }) {
 function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (screen: Screen) => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { paymentRequest, completePayment, online } = useWallet();
+  const { paymentRequest, completePayment, online, profile, biometricAvailable, biometricLabel } = useWallet();
+
+  const [permissionResponse, requestPermission] = useCameraPermissions();
+  const [asked, setAsked] = useState(false);
   const [result, setResult] = useState<'idle' | 'success' | 'offline'>('idle');
   const [pinModalVisible, setPinModalVisible] = useState(false);
-  const [pendingAmount, setPendingAmount] = useState(0);
   const [pinError, setPinError] = useState('');
+  const [scannedPayload, setScannedPayload] = useState<QrPayload | null>(null);
+  const [scanned, setScanned] = useState(false);
+  const [scanError, setScanError] = useState('');
+  const [cameraError, setCameraError] = useState(false);
+
   const hasRequest = Boolean(paymentRequest && paymentRequest.expiresAt > Date.now());
 
-  const scan = () => {
-    const amount = hasRequest ? paymentRequest?.amount ?? 35 : 35;
-    setPendingAmount(amount);
+  useEffect(() => {
+    // Native platforms request the camera permission up front. On web the
+    // permission is requested on demand (via the "Enable camera" button) so the
+    // scanner never surprises users with a permission prompt.
+    if (Platform.OS === 'web' || asked) return;
+    setAsked(true);
+    void requestPermission();
+  }, [asked]);
+
+  const resetScan = () => {
+    setScannedPayload(null);
+    setScanned(false);
+    setScanError('');
+    setCameraError(false);
+  };
+
+  const processPayload = (payload: QrPayload) => {
+    if (!hasRequest || !paymentRequest || paymentRequest.token !== payload.token) {
+      setScanError('QR could not be verified against an active request.');
+      setScanned(false);
+      return;
+    }
+    if (payload.expiresAt < Date.now()) {
+      setScanError('This QR has expired.');
+      setScanned(false);
+      return;
+    }
+    if (payload.amount <= 0) {
+      setScanError('This request is invalid.');
+      setScanned(false);
+      return;
+    }
+    setScannedPayload(payload);
+    setScanError('');
+    setScanned(true);
     setPinModalVisible(true);
   };
 
-  const handlePinConfirm = (pin: string) => {
-    const success = completePayment(pendingAmount, hasRequest ? 'QR' : 'DEMO', pin);
+  const handleBarcodeScanned = (scanningResult: { data: string }) => {
+    if (scanned) return;
+    const payload = decodeQrPayload(scanningResult.data);
+    if (!payload) {
+      setScanError('That is not a Paymerch QR code.');
+      return;
+    }
+    processPayload(payload);
+  };
+
+  const scanDemo = () => {
+    if (!hasRequest || !paymentRequest) {
+      setScanError('No active customer payment request to collect.');
+      return;
+    }
+    processPayload(buildQrPayload(paymentRequest, profile.name));
+  };
+
+  const handlePinConfirm = (auth: TransactionAuth) => {
+    if (!scannedPayload) return;
+    const success = completePayment(scannedPayload.amount, 'QR', auth);
     if (success) {
       setResult(online ? 'success' : 'offline');
       setPinModalVisible(false);
       setPinError('');
-      void Haptics.notificationAsync(online ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning);
+      void Haptics.notificationAsync(
+        online ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning,
+      );
     } else {
       setPinError('Invalid PIN. Please try again.');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -967,19 +1101,32 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <View style={[styles.successMark, { backgroundColor: result === 'success' ? colors.accent : colors.warm }]}>
           <Feather name={result === 'success' ? 'check' : 'clock'} size={34} color={result === 'success' ? colors.success : colors.warning} />
         </View>
-          <Text style={[styles.successTitle, { color: colors.foreground }]}>{result === 'success' ? 'Payment received' : 'Payment saved for sync'}</Text>
+        <Text style={[styles.successTitle, { color: colors.foreground }]}>{result === 'success' ? 'Payment received' : 'Payment saved for sync'}</Text>
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
-          {result === 'success' ? 'The customer and business wallets are updated.' : 'This payment is encrypted on-device and will sync when you reconnect.'}
+          {result === 'success'
+            ? 'The customer and business wallets are updated.'
+            : 'This payment is encrypted on-device and will sync when you reconnect.'}
         </Text>
         <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, { backgroundColor: colors.button }]}>
           <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Back to dashboard</Text>
         </HapticPressable>
-        <HapticPressable onPress={() => setResult('idle')} style={styles.textButton}>
+        <HapticPressable
+          onPress={() => {
+            setResult('idle');
+            resetScan();
+          }}
+          style={styles.textButton}
+        >
           <Text style={[styles.textButtonLabel, { color: colors.foreground }]}>Scan another payment</Text>
         </HapticPressable>
       </View>
     );
   }
+
+  const barcodeDetectorSupported =
+    Platform.OS !== 'web' || typeof (globalThis as { BarcodeDetector?: unknown }).BarcodeDetector !== 'undefined';
+  const canUseCamera = permissionResponse?.granted && !cameraError && barcodeDetectorSupported;
+  const showDemoFallback = !canUseCamera || !hasRequest;
 
   return (
     <View style={[styles.scannerRoot, { backgroundColor: colors.dark, paddingTop: insets.top + 18, paddingBottom: insets.bottom + 18 }]}>
@@ -993,7 +1140,20 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         </View>
         <StatusPill online={online} colors={colors} />
       </View>
-      <View style={styles.viewfinder}>
+
+      <View style={[styles.viewfinder, { height: canUseCamera ? 280 : 300, marginTop: 40 }]}>
+        {canUseCamera ? (
+          <CameraView
+            style={StyleSheet.absoluteFill}
+            facing="back"
+            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+            onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
+            onMountError={() => setCameraError(true)}
+            onCameraReady={() => {
+              setCameraError(false);
+            }}
+          />
+        ) : null}
         <View style={[styles.corner, styles.cornerTopLeft]} />
         <View style={[styles.corner, styles.cornerTopRight]} />
         <View style={[styles.corner, styles.cornerBottomLeft]} />
@@ -1002,22 +1162,60 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <View style={styles.viewfinderCenter}>
           <Feather name="maximize" size={34} color="rgba(255,255,255,0.75)" />
         </View>
+        {scanError ? (
+          <View style={styles.scanErrorPill}>
+            <Feather name="alert-circle" size={14} color={colors.warning} />
+            <Text style={[styles.scannerSubhint, { color: colors.warning }]}>{scanError}</Text>
+          </View>
+        ) : null}
       </View>
+
       <View style={styles.scannerCopy}>
-        <Text style={styles.scannerHint}>{hasRequest ? 'Customer payment detected' : 'Point your camera at the customer’s QR'}</Text>
+        <Text style={styles.scannerHint}>
+          {hasRequest ? 'Customer payment detected' : canUseCamera ? 'Point your camera at the customer’s QR' : 'Await a customer payment request'}
+        </Text>
         <Text style={styles.scannerSubhint}>
-          {hasRequest ? `${zar(paymentRequest?.amount ?? 35)} · Expires in 60 seconds` : 'The customer QR is single-use and signed.'}
+          {hasRequest
+            ? `${zar(scannedPayload?.amount ?? paymentRequest?.amount ?? 0)} · Expires in 60 seconds`
+            : canUseCamera
+              ? 'The customer QR is single-use and signed.'
+              : 'Ask the customer to generate a payment QR.'}
         </Text>
       </View>
-      <HapticPressable onPress={scan} style={[styles.scanDemoButton, { backgroundColor: colors.button }]}>
-        <Feather name="camera" size={18} color={colors.buttonForeground} />
-        <Text style={[styles.scanDemoText, { color: colors.buttonForeground }]}>{hasRequest ? 'Collect customer payment' : 'Use demo payment · R35'}</Text>
-      </HapticPressable>
-      <Text style={styles.scannerFootnote}>Camera access is simulated in this prototype</Text>
+
+      {showDemoFallback ? (
+        <HapticPressable onPress={scanDemo} style={[styles.scanDemoButton, { backgroundColor: colors.button }]}>
+          <Feather name="camera" size={18} color={colors.buttonForeground} />
+          <Text style={[styles.scanDemoText, { color: colors.buttonForeground }]}>
+            {hasRequest ? 'Collect customer payment' : 'No active request'}
+          </Text>
+        </HapticPressable>
+      ) : null}
+
+      {!canUseCamera && (
+        <HapticPressable
+          onPress={() => {
+            void requestPermission();
+            setAsked(false);
+          }}
+          style={[styles.scanDemoButton, { backgroundColor: colors.muted, marginTop: 8 }]}
+        >
+          <Feather name="camera" size={18} color={colors.foreground} />
+          <Text style={[styles.scanDemoText, { color: colors.foreground }]}>Enable camera</Text>
+        </HapticPressable>
+      )}
+      <Text style={styles.scannerFootnote}>
+        {canUseCamera ? 'Scanning live camera feed for QR codes' : 'Camera scanning is not available on this device in this preview'}
+      </Text>
       <PinConfirmationModal
         visible={pinModalVisible}
         onConfirm={handlePinConfirm}
-        onCancel={() => setPinModalVisible(false)}
+        onCancel={() => {
+          setPinModalVisible(false);
+          if (!scanned) resetScan();
+        }}
+        canUseBiometric={biometricAvailable}
+        biometricLabel={biometricLabel}
         title="Confirm Payment"
         error={pinError}
         onClearError={() => setPinError('')}
@@ -1029,7 +1227,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 function VasScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buyerBalance, vendVas } = useWallet();
+  const { buyerBalance, vendVas, biometricAvailable, biometricLabel } = useWallet();
   const [kind, setKind] = useState<'VAS_ELEC' | 'VAS_AIRTIME'>('VAS_ELEC');
   const [destination, setDestination] = useState('');
   const [amount, setAmount] = useState(50);
@@ -1053,8 +1251,8 @@ function VasScreen({ onBack }: { onBack: () => void }) {
     setPinModalVisible(true);
   };
 
-  const handlePinConfirm = (pin: string) => {
-    const result = vendVas(kind, amount, destination, pin);
+  const handlePinConfirm = (auth: TransactionAuth) => {
+    const result = vendVas(kind, amount, destination, auth);
     if (result === 'INVALID_PIN') {
       setError('Invalid PIN. Please try again.');
       return;
@@ -1163,6 +1361,8 @@ function VasScreen({ onBack }: { onBack: () => void }) {
         visible={pinModalVisible}
         onConfirm={handlePinConfirm}
         onCancel={() => setPinModalVisible(false)}
+        canUseBiometric={biometricAvailable}
+        biometricLabel={biometricLabel}
         title="Confirm VAS Transaction"
         error={error}
         onClearError={() => setError('')}
@@ -1325,10 +1525,10 @@ export default function PaymerchHome() {
   const [cashOutError, setCashOutError] = useState('');
   const [splashAcknowledged, setSplashAcknowledged] = useState(false);
   const colors = useColors();
-  const { cashOut, merchantBalance } = useWallet();
+  const { cashOut, merchantBalance, biometricAvailable, biometricLabel } = useWallet();
 
-  const handleCashOutPinConfirm = (pin: string) => {
-    if (cashOut(Number(cashOutAmount), pin)) {
+  const handleCashOutPinConfirm = (auth: TransactionAuth) => {
+    if (cashOut(Number(cashOutAmount), auth)) {
       setCashOutVisible(false);
       setPinModalVisible(false);
       setCashOutError('');
@@ -1388,6 +1588,8 @@ export default function PaymerchHome() {
         visible={pinModalVisible}
         onConfirm={handleCashOutPinConfirm}
         onCancel={() => setPinModalVisible(false)}
+        canUseBiometric={biometricAvailable}
+        biometricLabel={biometricLabel}
         title="Confirm Cash Out"
         error={cashOutError}
         onClearError={() => setCashOutError('')}
@@ -1440,7 +1642,9 @@ const styles = StyleSheet.create({
   registrationNote: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 13, paddingHorizontal: 18 },
   pinPad: { width: '100%', maxWidth: 330, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
   pinKey: { width: 92, height: 53, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  pinKeyCircle: { borderRadius: 30 },
   pinKeyText: { fontFamily: 'Inter_500Medium', fontSize: 22 },
+  scanErrorPill: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   biometricButton: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 10, marginTop: 10 },
   biometricText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
   demoHint: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 2 },

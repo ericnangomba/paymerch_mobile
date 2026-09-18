@@ -1,5 +1,5 @@
 const CACHE_NAME = 'paymerch-mockup-sandbox-v1';
-const APP_SHELL = ['/', '/index.html'];
+const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/favicon.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
