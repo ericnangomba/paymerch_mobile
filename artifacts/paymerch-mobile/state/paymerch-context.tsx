@@ -14,12 +14,18 @@ export type BusinessCategory =
   | 'Tomatoes & veggies'
   | 'Mini bus taxi';
 export type AccountType = 'individual' | 'business';
+export type BankAccountType = 'Cheque / Current' | 'Savings' | 'Transmission';
 
 export type UserProfile = {
   accountType: AccountType;
   name: string;
   phone: string;
   businessCategory?: BusinessCategory;
+  bankName?: string;
+  bankAccountHolder?: string;
+  bankAccountNumber?: string;
+  bankAccountType?: BankAccountType;
+  bankBranchCode?: string;
 };
 
 export type Transaction = {
