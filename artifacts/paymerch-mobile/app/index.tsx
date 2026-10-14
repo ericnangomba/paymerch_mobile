@@ -12,6 +12,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -29,6 +30,11 @@ import {
 
 type Screen = 'home' | 'pay' | 'scan' | 'vas' | 'activity' | 'settings';
 type IconName = React.ComponentProps<typeof Feather>['name'];
+type DeferredInstallPrompt = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>;
+};
+
 const businessCategories: BusinessCategory[] = [
   'Spaza shop',
   'Street vendor',
@@ -415,93 +421,161 @@ function AuthScreen() {
   return authContent;
 }
 
-function AppSplashScreen({ onContinue }: { onContinue: () => void }) {
+function AppSplashScreen({
+  onContinue,
+  onInstall,
+}: {
+  onContinue: () => void;
+  onInstall?: () => void;
+}) {
   const colors = useColors();
-  const logoOpacity = useMemo(() => new Animated.Value(0), []);
-  const logoScale = useMemo(() => new Animated.Value(0.8), []);
-  const buttonOpacity = useMemo(() => new Animated.Value(0), []);
-  const buttonTranslateY = useMemo(() => new Animated.Value(30), []);
-  const buttonScale = useMemo(() => new Animated.Value(1), []);
+  const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const [webHeight, setWebHeight] = useState(() =>
+    typeof window === 'undefined' ? windowHeight : window.innerHeight,
+  );
+  const compactLayout = (Platform.OS === 'web' ? webHeight : windowHeight) < 700;
+  const heroOpacity = useMemo(() => new Animated.Value(0), []);
+  const heroTranslateY = useMemo(() => new Animated.Value(14), []);
+  const actionOpacity = useMemo(() => new Animated.Value(0), []);
 
   useEffect(() => {
-    const animations = Animated.sequence([
-      Animated.parallel([
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-        Animated.spring(logoScale, {
-          toValue: 1,
-          friction: 8,
-          tension: 40,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.parallel([
-        Animated.timing(buttonOpacity, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.timing(buttonTranslateY, {
-          toValue: 0,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-      ]),
+    const useNativeDriver = Platform.OS !== 'web';
+    const animation = Animated.parallel([
+      Animated.timing(heroOpacity, {
+        toValue: 1,
+        duration: 420,
+        useNativeDriver,
+      }),
+      Animated.timing(heroTranslateY, {
+        toValue: 0,
+        duration: 420,
+        useNativeDriver,
+      }),
+      Animated.timing(actionOpacity, {
+        toValue: 1,
+        duration: 420,
+        delay: 120,
+        useNativeDriver,
+      }),
     ]);
 
-    animations.start();
+    animation.start();
+    return () => animation.stop();
+  }, [actionOpacity, heroOpacity, heroTranslateY]);
 
-    // Add a subtle pulse animation to the button
-    const pulseAnimation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(buttonScale, {
-          toValue: 1.05,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-        Animated.timing(buttonScale, {
-          toValue: 1,
-          duration: 1500,
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    pulseAnimation.start();
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
 
-    return () => {
-      animations.stop();
-      pulseAnimation.stop();
-    };
+    const updateHeight = () => setWebHeight(window.innerHeight);
+    window.addEventListener('resize', updateHeight);
+    updateHeight();
+    return () => window.removeEventListener('resize', updateHeight);
   }, []);
 
   const splashContent = (
-    <View style={[styles.splashRoot, { backgroundColor: colors.background }]}>
-      <View style={styles.splashCenter}>
-        <Animated.View style={{ opacity: logoOpacity, transform: [{ scale: logoScale }] }}>
-          <BrandMark size={120} />
-        </Animated.View>
+    <ScrollView
+      style={styles.splashScroll}
+      contentContainerStyle={[
+        styles.splashRoot,
+        compactLayout && styles.splashRootCompact,
+        {
+          backgroundColor: colors.background,
+          paddingTop: Math.max(insets.top + (compactLayout ? 12 : 20), compactLayout ? 16 : 28),
+          paddingBottom: Math.max(insets.bottom + (compactLayout ? 12 : 20), compactLayout ? 16 : 28),
+        },
+      ]}
+      contentInsetAdjustmentBehavior="never"
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
+      <View style={styles.splashTopline}>
+        <View style={styles.splashIdentity}>
+          <LogoIcon size={42} />
+          <View>
+            <Text style={[styles.splashBrandName, { color: colors.foreground }]}>PAYMERCH</Text>
+            <Text style={[styles.splashTagline, { color: colors.mutedForeground }]}>MOBILE WALLET</Text>
+          </View>
+        </View>
+        <View style={[styles.splashSecureBadge, { backgroundColor: colors.accent }]}>
+          <Feather name="shield" size={14} color={colors.accentForeground} />
+        </View>
       </View>
-      <Animated.View style={{ opacity: buttonOpacity, transform: [{ translateY: buttonTranslateY }] }}>
-        <Animated.View style={{ transform: [{ scale: buttonScale }] }}>
-          <HapticPressable onPress={onContinue} style={[styles.splashAction, { backgroundColor: colors.button }]}>
-            <Text style={[styles.splashActionText, { color: colors.buttonForeground }]}>Get started</Text>
-            <Feather name="arrow-right" size={16} color={colors.buttonForeground} />
-          </HapticPressable>
-        </Animated.View>
+
+      <Animated.View
+        style={[
+          styles.splashHero,
+          compactLayout && styles.splashHeroCompact,
+          {
+            opacity: heroOpacity,
+            transform: [{ translateY: heroTranslateY }],
+          },
+        ]}
+      >
+        <View style={[styles.splashArtwork, compactLayout && styles.splashArtworkCompact]}>
+          <View style={[styles.splashOrb, compactLayout && styles.splashOrbCompact, { backgroundColor: colors.accent }]} />
+          <View style={[styles.splashOrbInner, compactLayout && styles.splashOrbInnerCompact, { backgroundColor: colors.card }]}>
+            <LogoIcon size={compactLayout ? 58 : 76} />
+          </View>
+          <View style={[styles.splashFloatingIcon, styles.splashFloatingTop, { backgroundColor: colors.card }]}>
+            <Feather name="check" size={17} color={colors.accentForeground} />
+          </View>
+          <View style={[styles.splashFloatingIcon, styles.splashFloatingBottom, { backgroundColor: colors.button }]}>
+            <Feather name="credit-card" size={17} color={colors.buttonForeground} />
+          </View>
+        </View>
+        <Text style={[styles.splashEyebrow, { color: colors.accentForeground }]}>SIMPLY SECURE PAYMENTS</Text>
+        <Text style={[styles.splashHeadline, compactLayout && styles.splashHeadlineCompact, { color: colors.foreground }]}>
+          Payments that move you forward.
+        </Text>
+        <Text style={[styles.splashDescription, { color: colors.mutedForeground }]}>
+          Pay, get paid and manage your business wallet, even when you are offline.
+        </Text>
       </Animated.View>
-    </View>
+
+      <View style={[styles.splashFooter, compactLayout && styles.splashFooterCompact]}>
+        <View style={styles.splashFeatures}>
+          <View style={[styles.splashFeature, compactLayout && styles.splashFeatureCompact, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="zap" size={16} color={colors.button} />
+            <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>Fast payments</Text>
+          </View>
+          <View style={[styles.splashFeature, compactLayout && styles.splashFeatureCompact, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="wifi-off" size={16} color={colors.button} />
+            <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>Works offline</Text>
+          </View>
+          <View style={[styles.splashFeature, compactLayout && styles.splashFeatureCompact, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="lock" size={16} color={colors.button} />
+            <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>PIN protected</Text>
+          </View>
+        </View>
+        <Animated.View style={{ opacity: actionOpacity }}>
+          <HapticPressable
+            onPress={onContinue}
+            style={[styles.splashAction, compactLayout && styles.splashActionCompact, { backgroundColor: colors.button }]}
+            testID="splash-get-started"
+          >
+            <Text style={[styles.splashActionText, { color: colors.buttonForeground }]}>Get started</Text>
+            <Feather name="arrow-right" size={18} color={colors.buttonForeground} />
+          </HapticPressable>
+          {onInstall ? (
+            <HapticPressable onPress={onInstall} style={styles.splashInstallAction} testID="splash-install">
+              <Feather name="download" size={16} color={colors.foreground} />
+              <Text style={[styles.splashInstallText, { color: colors.foreground }]}>Install Paymerch</Text>
+            </HapticPressable>
+          ) : null}
+        </Animated.View>
+        <View style={styles.splashSecurityNote}>
+          <Feather name="shield" size={13} color={colors.mutedForeground} />
+          <Text style={[styles.splashSecurityText, { color: colors.mutedForeground }]}>
+            Your money and details stay protected
+          </Text>
+        </View>
+      </View>
+    </ScrollView>
   );
 
-  // Add web container for proper centering on web
   if (Platform.OS === 'web') {
-    return (
-      <View style={styles.webContainer}>
-        {splashContent}
-      </View>
-    );
+    return <View style={styles.webContainer}>{splashContent}</View>;
   }
 
   return splashContent;
@@ -1524,8 +1598,33 @@ export default function PaymerchHome() {
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [cashOutError, setCashOutError] = useState('');
   const [splashAcknowledged, setSplashAcknowledged] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<DeferredInstallPrompt | null>(null);
   const colors = useColors();
   const { cashOut, merchantBalance, biometricAvailable, biometricLabel } = useWallet();
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as DeferredInstallPrompt);
+    };
+    const handleAppInstalled = () => setInstallPrompt(null);
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    window.addEventListener('appinstalled', handleAppInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      window.removeEventListener('appinstalled', handleAppInstalled);
+    };
+  }, []);
+
+  const installApp = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
 
   const handleCashOutPinConfirm = (auth: TransactionAuth) => {
     if (cashOut(Number(cashOutAmount), auth)) {
@@ -1538,7 +1637,14 @@ export default function PaymerchHome() {
     }
   };
 
-  if (!splashAcknowledged || !ready) return <AppSplashScreen onContinue={() => setSplashAcknowledged(true)} />;
+  if (!splashAcknowledged || !ready) {
+    return (
+      <AppSplashScreen
+        onContinue={() => setSplashAcknowledged(true)}
+        onInstall={installPrompt ? () => void installApp() : undefined}
+      />
+    );
+  }
   if (!signedIn) return <AuthScreen />;
 
   const navigate = (next: Screen) => {
@@ -1613,130 +1719,160 @@ const styles = StyleSheet.create({
   appRoot: { flex: 1, maxWidth: 480, alignSelf: 'center', width: '100%' },
   webContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBFBFA' },
   loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
-  loadingText: { fontFamily: 'Inter_500Medium', fontSize: 14 },
-  splashRoot: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24, paddingTop: 120, paddingBottom: 60 },
-  splashCenter: { alignItems: 'center', justifyContent: 'center', flex: 1, gap: 8, width: '100%', paddingHorizontal: 32 },
-  splashBrandName: { fontFamily: 'Inter_700Bold', fontSize: 18, letterSpacing: 3.8, textAlign: 'center' },
-  splashTagline: { fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center' },
-  splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, minWidth: 150, paddingHorizontal: 18, paddingVertical: 13, alignSelf: 'center' },
-  splashActionText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  loadingText: { fontFamily: 'Roboto_500Medium', fontSize: 14 },
+  splashScroll: { flex: 1, width: '100%' },
+  splashRoot: { flexGrow: 1, alignItems: 'stretch', justifyContent: 'space-between', gap: 24, paddingHorizontal: 24, width: '100%', maxWidth: 480, alignSelf: 'center' },
+  splashRootCompact: { gap: 14 },
+  splashTopline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  splashIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  splashBrandName: { fontFamily: 'Roboto_700Bold', fontSize: 16, letterSpacing: 2.2 },
+  splashTagline: { fontFamily: 'Roboto_500Medium', fontSize: 10, letterSpacing: 1.4, marginTop: 2 },
+  splashSecureBadge: { width: 38, height: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  splashHero: { alignItems: 'center', width: '100%' },
+  splashHeroCompact: { flexShrink: 0 },
+  splashArtwork: { width: 224, height: 204, alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 22 },
+  splashArtworkCompact: { height: 148, marginBottom: 12 },
+  splashOrb: { position: 'absolute', width: 190, height: 190, borderRadius: 95, opacity: 0.8 },
+  splashOrbCompact: { width: 140, height: 140, borderRadius: 70 },
+  splashOrbInner: { width: 150, height: 150, borderRadius: 75, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
+  splashOrbInnerCompact: { width: 116, height: 116, borderRadius: 58 },
+  splashFloatingIcon: { position: 'absolute', width: 40, height: 40, borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  splashFloatingTop: { top: 19, right: 16 },
+  splashFloatingBottom: { bottom: 15, left: 16 },
+  splashEyebrow: { fontFamily: 'Roboto_700Bold', fontSize: 10, letterSpacing: 1.6, textAlign: 'center' },
+  splashHeadline: { fontFamily: 'Roboto_700Bold', fontSize: 29, lineHeight: 35, letterSpacing: -0.5, textAlign: 'center', marginTop: 10, maxWidth: 340 },
+  splashHeadlineCompact: { fontSize: 25, lineHeight: 30 },
+  splashDescription: { fontFamily: 'Roboto_400Regular', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 10, maxWidth: 330 },
+  splashFooter: { gap: 17 },
+  splashFooterCompact: { gap: 10 },
+  splashFeatures: { flexDirection: 'row', gap: 8 },
+  splashFeature: { flex: 1, minHeight: 66, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 8, paddingHorizontal: 3 },
+  splashFeatureCompact: { minHeight: 54, gap: 4, paddingVertical: 6 },
+  splashFeatureText: { fontFamily: 'Roboto_500Medium', fontSize: 10, textAlign: 'center' },
+  splashAction: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 16, minHeight: 54, paddingHorizontal: 20, alignSelf: 'stretch' },
+  splashActionCompact: { minHeight: 48 },
+  splashActionText: { fontFamily: 'Roboto_600SemiBold', fontSize: 15 },
+  splashInstallAction: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  splashInstallText: { fontFamily: 'Roboto_600SemiBold', fontSize: 13 },
+  splashSecurityNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 1 },
+  splashSecurityText: { fontFamily: 'Roboto_400Regular', fontSize: 11, textAlign: 'center' },
   authRoot: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between', maxWidth: 480, alignSelf: 'center', width: '100%' },
   authTop: { alignItems: 'center', paddingTop: 76, gap: 5, width: '100%' },
-  brandName: { fontFamily: 'Inter_700Bold', fontSize: 16, letterSpacing: 3.4, textAlign: 'center' },
-  tagline: { fontFamily: 'Inter_400Regular', fontSize: 13, textAlign: 'center' },
+  brandName: { fontFamily: 'Roboto_700Bold', fontSize: 16, letterSpacing: 3.4, textAlign: 'center' },
+  tagline: { fontFamily: 'Roboto_400Regular', fontSize: 13, textAlign: 'center' },
   authBody: { alignItems: 'center', width: '100%', marginTop: 20 },
-  authEyebrow: { fontFamily: 'Inter_700Bold', fontSize: 11, letterSpacing: 1.6, textAlign: 'center' },
-  authTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8, textAlign: 'center' },
-  authSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, marginTop: 9, textAlign: 'center' },
+  authEyebrow: { fontFamily: 'Roboto_700Bold', fontSize: 11, letterSpacing: 1.6, textAlign: 'center' },
+  authTitle: { fontFamily: 'Roboto_700Bold', fontSize: 28, marginTop: 8, textAlign: 'center' },
+  authSubtitle: { fontFamily: 'Roboto_400Regular', fontSize: 14, marginTop: 9, textAlign: 'center' },
   pinDots: { flexDirection: 'row', gap: 12, marginTop: 28, marginBottom: 14 },
   pinDot: { width: 10, height: 10, borderRadius: 5 },
-  errorText: { fontFamily: 'Inter_500Medium', fontSize: 12, textAlign: 'center', marginTop: 7, maxWidth: 290 },
+  errorText: { fontFamily: 'Roboto_500Medium', fontSize: 12, textAlign: 'center', marginTop: 7, maxWidth: 290 },
   registerLink: { padding: 10, marginTop: 5 },
-  registerLinkText: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+  registerLinkText: { fontFamily: 'Roboto_500Medium', fontSize: 12 },
   registrationRoot: { paddingHorizontal: 18 },
   registrationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-  registrationTitle: { fontFamily: 'Inter_700Bold', fontSize: 28, marginTop: 8, textAlign: 'center' },
-  registrationSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 14, lineHeight: 20, marginTop: 9, maxWidth: 330, textAlign: 'center' },
+  registrationTitle: { fontFamily: 'Roboto_700Bold', fontSize: 28, marginTop: 8, textAlign: 'center' },
+  registrationSubtitle: { fontFamily: 'Roboto_400Regular', fontSize: 14, lineHeight: 20, marginTop: 9, maxWidth: 330, textAlign: 'center' },
   registrationPinRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
   registrationPinField: { flex: 1 },
-  registrationNote: { fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 13, paddingHorizontal: 18 },
+  registrationNote: { fontFamily: 'Roboto_400Regular', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 13, paddingHorizontal: 18 },
   pinPad: { width: '100%', maxWidth: 330, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
   pinKey: { width: 92, height: 53, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   pinKeyCircle: { borderRadius: 30 },
-  pinKeyText: { fontFamily: 'Inter_500Medium', fontSize: 22 },
+  pinKeyText: { fontFamily: 'Roboto_500Medium', fontSize: 22 },
   scanErrorPill: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   biometricButton: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 10, marginTop: 10 },
-  biometricText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  demoHint: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 2 },
-  secureFooter: { textAlign: 'center', fontFamily: 'Inter_400Regular', fontSize: 12, paddingBottom: 24 },
+  biometricText: { fontFamily: 'Roboto_600SemiBold', fontSize: 13 },
+  demoHint: { fontFamily: 'Roboto_400Regular', fontSize: 12, marginTop: 2 },
+  secureFooter: { textAlign: 'center', fontFamily: 'Roboto_400Regular', fontSize: 12, paddingBottom: 24 },
   scrollContent: { paddingHorizontal: 18 },
   screenRoot: { flex: 1, paddingHorizontal: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   headerIdentity: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  headerTitle: { fontFamily: 'Inter_700Bold', fontSize: 15 },
-  headerSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 3 },
+  headerTitle: { fontFamily: 'Roboto_700Bold', fontSize: 15 },
+  headerSubtitle: { fontFamily: 'Roboto_400Regular', fontSize: 12, marginTop: 3 },
   headerActions: { flexDirection: 'row', alignItems: 'center', gap: 9 },
   statusPill: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 9, paddingVertical: 6, borderRadius: 20 },
   statusDot: { width: 6, height: 6, borderRadius: 3 },
-  statusText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
+  statusText: { fontFamily: 'Roboto_600SemiBold', fontSize: 11 },
   iconButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 12 },
   balanceCard: { borderRadius: 24, padding: 19, marginTop: 20, minHeight: 148 },
   balanceTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  balanceLabel: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.2, color: '#A7A7A7' },
+  balanceLabel: { fontFamily: 'Roboto_700Bold', fontSize: 10, letterSpacing: 1.2, color: '#A7A7A7' },
   balanceVisibility: { padding: 4 },
-  balanceAmount: { fontFamily: 'Inter_700Bold', fontSize: 34, letterSpacing: -1.2, color: '#FFFFFF', marginTop: 19 },
+  balanceAmount: { fontFamily: 'Roboto_700Bold', fontSize: 34, letterSpacing: -1.2, color: '#FFFFFF', marginTop: 19 },
   balanceBottom: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 17 },
-  balanceFoot: { fontFamily: 'Inter_400Regular', color: '#A7A7A7', fontSize: 12 },
+  balanceFoot: { fontFamily: 'Roboto_400Regular', color: '#A7A7A7', fontSize: 12 },
   secureBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  secureBadgeText: { fontFamily: 'Inter_500Medium', color: '#A7F3D0', fontSize: 11 },
+  secureBadgeText: { fontFamily: 'Roboto_500Medium', color: '#A7F3D0', fontSize: 11 },
   pinModal: { borderRadius: 24, padding: 24, width: '90%', maxWidth: 360, alignSelf: 'center' },
   pinModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  pinModalTitle: { fontFamily: 'Inter_700Bold', fontSize: 20, marginTop: 4 },
+  pinModalTitle: { fontFamily: 'Roboto_700Bold', fontSize: 20, marginTop: 4 },
   scanCta: { borderRadius: 22, minHeight: 112, padding: 18, marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  scanCtaEyebrow: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.1 },
-  scanCtaTitle: { fontFamily: 'Inter_700Bold', fontSize: 22, marginTop: 6 },
-  scanCtaText: { fontFamily: 'Inter_400Regular', fontSize: 12, marginTop: 4 },
+  scanCtaEyebrow: { fontFamily: 'Roboto_700Bold', fontSize: 10, letterSpacing: 1.1 },
+  scanCtaTitle: { fontFamily: 'Roboto_700Bold', fontSize: 22, marginTop: 6 },
+  scanCtaText: { fontFamily: 'Roboto_400Regular', fontSize: 12, marginTop: 4 },
   scanCtaIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 11 },
-  sectionTitle: { fontFamily: 'Inter_700Bold', fontSize: 16 },
-  sectionHint: { fontFamily: 'Inter_400Regular', fontSize: 12 },
-  sectionLink: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  sectionTitle: { fontFamily: 'Roboto_700Bold', fontSize: 16 },
+  sectionHint: { fontFamily: 'Roboto_400Regular', fontSize: 12 },
+  sectionLink: { fontFamily: 'Roboto_600SemiBold', fontSize: 12 },
   actionGrid: { flexDirection: 'row', gap: 8 },
   quickAction: { flex: 1, minHeight: 82, borderRadius: 18, borderWidth: 1, padding: 12, justifyContent: 'space-between' },
   quickIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  quickLabel: { fontFamily: 'Roboto_600SemiBold', fontSize: 13 },
   activityCard: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14 },
   activityRow: { flexDirection: 'row', alignItems: 'center', minHeight: 73, borderBottomWidth: 1, borderBottomColor: '#F0F0ED' },
   activityIcon: { width: 37, height: 37, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   activityCopy: { flex: 1, paddingLeft: 10 },
-  activityTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  activitySubtitle: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 },
+  activityTitle: { fontFamily: 'Roboto_600SemiBold', fontSize: 13 },
+  activitySubtitle: { fontFamily: 'Roboto_400Regular', fontSize: 11, marginTop: 4 },
   activityValue: { alignItems: 'flex-end', gap: 5 },
-  activityAmount: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  activityAmount: { fontFamily: 'Roboto_600SemiBold', fontSize: 13 },
   miniStatus: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 3 },
-  miniStatusText: { fontFamily: 'Inter_600SemiBold', fontSize: 9 },
+  miniStatusText: { fontFamily: 'Roboto_600SemiBold', fontSize: 9 },
   offlineBanner: { flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 16, padding: 13, marginTop: 14 },
   offlineCopy: { flex: 1 },
-  offlineTitle: { fontFamily: 'Inter_700Bold', fontSize: 12 },
-  offlineText: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 3, lineHeight: 16 },
+  offlineTitle: { fontFamily: 'Roboto_700Bold', fontSize: 12 },
+  offlineText: { fontFamily: 'Roboto_400Regular', fontSize: 11, marginTop: 3, lineHeight: 16 },
   pageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 23 },
   backButton: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  pageEyebrow: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.3 },
-  pageTitle: { fontFamily: 'Inter_700Bold', fontSize: 25, marginTop: 4 },
+  pageEyebrow: { fontFamily: 'Roboto_700Bold', fontSize: 10, letterSpacing: 1.3 },
+  pageTitle: { fontFamily: 'Roboto_700Bold', fontSize: 25, marginTop: 4 },
   payBalance: { borderWidth: 1, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  cardLabel: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.2 },
-  payBalanceAmount: { fontFamily: 'Inter_700Bold', fontSize: 24, marginTop: 7 },
+  cardLabel: { fontFamily: 'Roboto_700Bold', fontSize: 10, letterSpacing: 1.2 },
+  payBalanceAmount: { fontFamily: 'Roboto_700Bold', fontSize: 24, marginTop: 7 },
   payBalanceIcon: { width: 39, height: 39, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   amountHeader: { alignItems: 'center', marginTop: 23 },
-  amountDisplay: { fontFamily: 'Inter_700Bold', fontSize: 42, letterSpacing: -1, marginTop: 8 },
-  validationText: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 3 },
+  amountDisplay: { fontFamily: 'Roboto_700Bold', fontSize: 42, letterSpacing: -1, marginTop: 8 },
+  validationText: { fontFamily: 'Roboto_400Regular', fontSize: 11, marginTop: 3 },
   quickAmounts: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 15 },
   quickAmount: { borderWidth: 1, borderRadius: 11, paddingHorizontal: 12, paddingVertical: 8 },
-  quickAmountText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  quickAmountText: { fontFamily: 'Roboto_600SemiBold', fontSize: 12 },
   amountKeypad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 9, marginTop: 17 },
   amountKey: { width: '30%', height: 45, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  amountKeyText: { fontFamily: 'Inter_500Medium', fontSize: 19 },
+  amountKeyText: { fontFamily: 'Roboto_500Medium', fontSize: 19 },
   primaryButton: { minHeight: 53, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9 },
-  primaryButtonText: { fontFamily: 'Inter_700Bold', fontSize: 14 },
+  primaryButtonText: { fontFamily: 'Roboto_700Bold', fontSize: 14 },
   pressed: { opacity: 0.72 },
   disabled: { opacity: 0.35 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.58)', justifyContent: 'flex-end' },
   qrModal: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, alignItems: 'center', minHeight: 500 },
   qrModalHeader: { width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
-  qrModalTitle: { fontFamily: 'Inter_700Bold', fontSize: 30, marginTop: 4 },
+  qrModalTitle: { fontFamily: 'Roboto_700Bold', fontSize: 30, marginTop: 4 },
   closeButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   qrFrame: { padding: 12, borderRadius: 18, borderWidth: 1 },
   qrGrid: { width: 210, height: 210, flexDirection: 'row', flexWrap: 'wrap' },
   qrCell: { width: 10, height: 10 },
   timerPill: { flexDirection: 'row', gap: 6, alignItems: 'center', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, marginTop: 16 },
-  timerText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  qrInstruction: { fontFamily: 'Inter_400Regular', fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: 15, maxWidth: 280 },
-  tokenText: { fontFamily: 'Inter_400Regular', fontSize: 9, marginTop: 9 },
+  timerText: { fontFamily: 'Roboto_600SemiBold', fontSize: 12 },
+  qrInstruction: { fontFamily: 'Roboto_400Regular', fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: 15, maxWidth: 280 },
+  tokenText: { fontFamily: 'Roboto_400Regular', fontSize: 9, marginTop: 9 },
   scannerRoot: { flex: 1, paddingHorizontal: 18 },
   scannerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   scannerBack: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
-  scannerEyebrow: { fontFamily: 'Inter_700Bold', color: '#8A8A8A', fontSize: 10, letterSpacing: 1.2 },
-  scannerTitle: { fontFamily: 'Inter_700Bold', color: '#FFFFFF', fontSize: 22, marginTop: 4 },
+  scannerEyebrow: { fontFamily: 'Roboto_700Bold', color: '#8A8A8A', fontSize: 10, letterSpacing: 1.2 },
+  scannerTitle: { fontFamily: 'Roboto_700Bold', color: '#FFFFFF', fontSize: 22, marginTop: 4 },
   viewfinder: { height: 300, marginTop: 40, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   corner: { position: 'absolute', width: 48, height: 48, borderColor: '#FFFFFF' },
   cornerTopLeft: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 14 },
@@ -1746,65 +1882,65 @@ const styles = StyleSheet.create({
   scanLine: { position: 'absolute', top: '49%', left: 28, right: 28, height: 1, backgroundColor: '#10B981' },
   viewfinderCenter: { width: 80, height: 80, borderRadius: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', alignItems: 'center', justifyContent: 'center' },
   scannerCopy: { alignItems: 'center', marginTop: 34 },
-  scannerHint: { fontFamily: 'Inter_600SemiBold', color: '#FFFFFF', fontSize: 16 },
-  scannerSubhint: { fontFamily: 'Inter_400Regular', color: '#999999', fontSize: 12, marginTop: 8, textAlign: 'center' },
+  scannerHint: { fontFamily: 'Roboto_600SemiBold', color: '#FFFFFF', fontSize: 16 },
+  scannerSubhint: { fontFamily: 'Roboto_400Regular', color: '#999999', fontSize: 12, marginTop: 8, textAlign: 'center' },
   scanDemoButton: { minHeight: 54, borderRadius: 17, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9, marginTop: 'auto' },
-  scanDemoText: { fontFamily: 'Inter_700Bold', fontSize: 14 },
-  scannerFootnote: { fontFamily: 'Inter_400Regular', color: '#777777', textAlign: 'center', fontSize: 11, marginTop: 12 },
+  scanDemoText: { fontFamily: 'Roboto_700Bold', fontSize: 14 },
+  scannerFootnote: { fontFamily: 'Roboto_400Regular', color: '#777777', textAlign: 'center', fontSize: 11, marginTop: 12 },
   successRoot: { flex: 1, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' },
   successMark: { width: 78, height: 78, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  successTitle: { fontFamily: 'Inter_700Bold', fontSize: 26, marginTop: 20 },
-  successSubtitle: { fontFamily: 'Inter_400Regular', textAlign: 'center', lineHeight: 20, fontSize: 14, marginTop: 10, maxWidth: 300 },
+  successTitle: { fontFamily: 'Roboto_700Bold', fontSize: 26, marginTop: 20 },
+  successSubtitle: { fontFamily: 'Roboto_400Regular', textAlign: 'center', lineHeight: 20, fontSize: 14, marginTop: 10, maxWidth: 300 },
   textButton: { padding: 15, marginTop: 6 },
-  textButtonLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  textButtonLabel: { fontFamily: 'Roboto_600SemiBold', fontSize: 13 },
   segmented: { borderRadius: 15, padding: 4, flexDirection: 'row', marginBottom: 27, alignSelf: 'center', gap: 12 },
   segment: { flex: 1, flexDirection: 'row', gap: 7, alignItems: 'center', justifyContent: 'center', paddingVertical: 11, borderRadius: 12 },
-  segmentText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
-  formLabel: { fontFamily: 'Inter_700Bold', fontSize: 10, letterSpacing: 1.2, marginBottom: 9, textAlign: 'center' },
-  textInput: { borderWidth: 1, borderRadius: 15, minHeight: 53, paddingHorizontal: 15, fontFamily: 'Inter_400Regular', fontSize: 14 },
+  segmentText: { fontFamily: 'Roboto_600SemiBold', fontSize: 12 },
+  formLabel: { fontFamily: 'Roboto_700Bold', fontSize: 10, letterSpacing: 1.2, marginBottom: 9, textAlign: 'center' },
+  textInput: { borderWidth: 1, borderRadius: 15, minHeight: 53, paddingHorizontal: 15, fontFamily: 'Roboto_400Regular', fontSize: 14 },
   vasAmountHeader: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
-  balanceHint: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  balanceHint: { fontFamily: 'Roboto_400Regular', fontSize: 12 },
   vasOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   vasOption: { width: '48%', minHeight: 54, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  vasOptionText: { fontFamily: 'Inter_700Bold', fontSize: 15 },
+  vasOptionText: { fontFamily: 'Roboto_700Bold', fontSize: 15 },
   infoBanner: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', borderRadius: 15, padding: 13, marginTop: 17 },
-  infoText: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16 },
+  infoText: { flex: 1, fontFamily: 'Roboto_400Regular', fontSize: 11, lineHeight: 16 },
   receiptCard: { borderRadius: 22, borderWidth: 1, padding: 21, alignItems: 'center', marginTop: 30 },
   receiptMark: { width: 58, height: 58, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
-  receiptTitle: { fontFamily: 'Inter_700Bold', fontSize: 21, marginTop: 16 },
-  receiptSub: { fontFamily: 'Inter_400Regular', textAlign: 'center', fontSize: 12, lineHeight: 17, marginTop: 7 },
+  receiptTitle: { fontFamily: 'Roboto_700Bold', fontSize: 21, marginTop: 16 },
+  receiptSub: { fontFamily: 'Roboto_400Regular', textAlign: 'center', fontSize: 12, lineHeight: 17, marginTop: 7 },
   tokenBox: { width: '100%', borderRadius: 15, paddingVertical: 18, paddingHorizontal: 10, alignItems: 'center', marginTop: 22, marginBottom: 20 },
-  tokenValue: { fontFamily: 'Inter_700Bold', fontSize: 20, letterSpacing: 1.4, textAlign: 'center' },
-  tokenCaption: { fontFamily: 'Inter_700Bold', fontSize: 9, letterSpacing: 1, marginTop: 8 },
+  tokenValue: { fontFamily: 'Roboto_700Bold', fontSize: 20, letterSpacing: 1.4, textAlign: 'center' },
+  tokenCaption: { fontFamily: 'Roboto_700Bold', fontSize: 9, letterSpacing: 1, marginTop: 8 },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, minHeight: 76, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingTop: 8 },
   navItem: { alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 58 },
   navIcon: { width: 31, height: 26, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  navLabel: { fontFamily: 'Inter_600SemiBold', fontSize: 10 },
+  navLabel: { fontFamily: 'Roboto_600SemiBold', fontSize: 10 },
   cashOutModal: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, minHeight: 280 },
   settingsProfile: { borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28 },
   profileInitials: { width: 48, height: 48, borderRadius: 17, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
-  profileInitialText: { fontFamily: 'Inter_700Bold', color: '#0A0A0A', fontSize: 16 },
-  settingsName: { fontFamily: 'Inter_700Bold', color: '#FFFFFF', fontSize: 15 },
-  settingsPhone: { fontFamily: 'Inter_400Regular', color: '#A7A7A7', fontSize: 12, marginTop: 5 },
+  profileInitialText: { fontFamily: 'Roboto_700Bold', color: '#0A0A0A', fontSize: 16 },
+  settingsName: { fontFamily: 'Roboto_700Bold', color: '#FFFFFF', fontSize: 15 },
+  settingsPhone: { fontFamily: 'Roboto_400Regular', color: '#A7A7A7', fontSize: 12, marginTop: 5 },
   categoryCard: { borderWidth: 1, borderRadius: 20, padding: 14, marginBottom: 23 },
-  categoryIntro: { fontFamily: 'Inter_400Regular', fontSize: 12, lineHeight: 17, marginBottom: 12 },
+  categoryIntro: { fontFamily: 'Roboto_400Regular', fontSize: 12, lineHeight: 17, marginBottom: 12 },
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   categoryChip: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 9 },
-  categoryChipText: { fontFamily: 'Inter_600SemiBold', fontSize: 11 },
+  categoryChipText: { fontFamily: 'Roboto_600SemiBold', fontSize: 11 },
   individualNote: { borderRadius: 16, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginBottom: 23 },
-  individualNoteText: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16 },
+  individualNoteText: { flex: 1, fontFamily: 'Roboto_400Regular', fontSize: 11, lineHeight: 16 },
   settingsCard: { borderWidth: 1, borderRadius: 20, padding: 14, marginBottom: 23 },
   settingRow: { flexDirection: 'row', alignItems: 'center', gap: 11 },
   settingIcon: { width: 37, height: 37, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
   settingCopy: { flex: 1 },
-  settingTitle: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
-  settingSubtitle: { fontFamily: 'Inter_400Regular', fontSize: 11, marginTop: 4 },
+  settingTitle: { fontFamily: 'Roboto_600SemiBold', fontSize: 13 },
+  settingSubtitle: { fontFamily: 'Roboto_400Regular', fontSize: 11, marginTop: 4 },
   toggle: { width: 42, height: 25, borderRadius: 20, padding: 3, justifyContent: 'center' },
   toggleThumb: { width: 19, height: 19, borderRadius: 10 },
   syncButton: { minHeight: 39, borderRadius: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 13 },
-  syncButtonText: { fontFamily: 'Inter_600SemiBold', fontSize: 12 },
+  syncButtonText: { fontFamily: 'Roboto_600SemiBold', fontSize: 12 },
   settingsNote: { borderRadius: 16, padding: 14, flexDirection: 'row', gap: 10, alignItems: 'flex-start' },
-  settingsNoteText: { flex: 1, fontFamily: 'Inter_400Regular', fontSize: 11, lineHeight: 16 },
+  settingsNoteText: { flex: 1, fontFamily: 'Roboto_400Regular', fontSize: 11, lineHeight: 16 },
   logoutButton: { minHeight: 51, borderRadius: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 22 },
-  logoutText: { fontFamily: 'Inter_600SemiBold', fontSize: 13 },
+  logoutText: { fontFamily: 'Roboto_600SemiBold', fontSize: 13 },
 });

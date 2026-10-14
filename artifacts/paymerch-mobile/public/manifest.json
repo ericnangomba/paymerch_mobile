@@ -1,6 +1,7 @@
 {
   "name": "Paymerch Mobile",
   "short_name": "Paymerch",
+  "id": "/",
   "description": "Paymerch Mobile - a local-first digital wallet for informal businesses. Pay and get paid by scanning QR codes, vend airtime and electricity tokens, cash out, and sync offline, secured with a PIN or biometrics.",
   "start_url": "/",
   "scope": "/",
@@ -8,6 +9,9 @@
   "orientation": "portrait",
   "background_color": "#FBFBFA",
   "theme_color": "#00A8A8",
+  "lang": "en-ZA",
+  "categories": ["finance", "business"],
+  "prefer_related_applications": false,
   "icons": [
     {
       "src": "/icons/192.png",

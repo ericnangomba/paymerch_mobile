@@ -6,7 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/images/mlogo.png",
     "splash": {
-      "image": "./assets/images/paymerchlogo.png",
+      "image": "./assets/images/mlogo.png",
+      "imageWidth": 160,
       "resizeMode": "contain",
       "backgroundColor": "#FBFBFA"
     },
