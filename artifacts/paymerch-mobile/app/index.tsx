@@ -45,6 +45,16 @@ const businessCategories: BusinessCategory[] = [
   'Mini bus taxi',
 ];
 
+const businessCategoryIcons: Record<BusinessCategory, IconName> = {
+  'Spaza shop': 'shopping-bag',
+  'Street vendor': 'map-pin',
+  Carwash: 'droplet',
+  'Tshisa nyama': 'coffee',
+  'Street food stall': 'coffee',
+  'Tomatoes & veggies': 'sun',
+  'Mini bus taxi': 'truck',
+};
+
 const logo = require('../assets/images/paymerchlogo.png');
 const logoMark = require('../assets/images/mlogo.png');
 
@@ -489,19 +499,6 @@ function AppSplashScreen({
       showsVerticalScrollIndicator={false}
       bounces={false}
     >
-      <View style={styles.splashTopline}>
-        <View style={styles.splashIdentity}>
-          <LogoIcon size={42} />
-          <View>
-            <Text style={[styles.splashBrandName, { color: colors.foreground }]}>PAYMERCH</Text>
-            <Text style={[styles.splashTagline, { color: colors.mutedForeground }]}>MOBILE WALLET</Text>
-          </View>
-        </View>
-        <View style={[styles.splashSecureBadge, { backgroundColor: colors.accent }]}>
-          <Feather name="shield" size={14} color={colors.accentForeground} />
-        </View>
-      </View>
-
       <Animated.View
         style={[
           styles.splashHero,
@@ -591,6 +588,7 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
   const [category, setCategory] = useState<BusinessCategory>('Spaza shop');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
+  const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState('');
 
   const submit = async () => {
@@ -624,114 +622,174 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.registrationRoot, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 26 }]}
+      contentContainerStyle={[styles.registrationRoot, { paddingTop: insets.top + 14, paddingBottom: insets.bottom + 28 }]}
       keyboardShouldPersistTaps="handled"
+      style={{ backgroundColor: colors.background }}
     >
       <View style={styles.registrationHeader}>
-        <HapticPressable onPress={onBack} style={styles.backButton}>
-          <Feather name="arrow-left" size={21} color={colors.foreground} />
+        <HapticPressable onPress={onBack} style={[styles.registrationBackButton, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Feather name="arrow-left" size={19} color={colors.foreground} />
         </HapticPressable>
-        <BrandMark size={120} />
-        <View style={{ width: 42 }} />
+        <View style={styles.registrationProgress}>
+          <View style={[styles.registrationProgressTrack, { backgroundColor: colors.border }]}>
+            <View style={[styles.registrationProgressFill, { backgroundColor: colors.button }]} />
+          </View>
+          <Text style={[styles.registrationProgressText, { color: colors.mutedForeground }]}>ACCOUNT SETUP</Text>
+        </View>
+        <View style={{ width: 44 }} />
       </View>
-      <View style={styles.authBody}>
-        <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>FIRST TIME SETUP</Text>
+      <View style={styles.registrationIntro}>
+        <View style={[styles.registrationEyebrow, { backgroundColor: colors.accent }]}>
+          <Feather name="shield" size={13} color={colors.accentForeground} />
+          <Text style={[styles.authEyebrow, { color: colors.accentForeground }]}>FIRST TIME SETUP</Text>
+        </View>
         <Text style={[styles.registrationTitle, { color: colors.foreground }]}>Create your wallet</Text>
         <Text style={[styles.registrationSubtitle, { color: colors.mutedForeground }]}>
           Set up your account and PIN for secure transactions.
         </Text>
       </View>
-      <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 25, textAlign: 'center' }]}>I AM REGISTERING AS</Text>
-      <View style={[styles.segmented, { backgroundColor: colors.muted }]}>
+      <View style={styles.registrationSection}>
+        <Text style={[styles.registrationSectionTitle, { color: colors.foreground }]}>I am registering as</Text>
+        <Text style={[styles.registrationSectionHint, { color: colors.mutedForeground }]}>Choose the account that best describes you.</Text>
+      </View>
+      <View style={styles.accountTypeOptions}>
         {(['business', 'individual'] as AccountType[]).map((type) => {
           const selected = accountType === type;
           return (
             <HapticPressable
               key={type}
               onPress={() => { setAccountType(type); setError(''); }}
-              style={[styles.segment, selected && { backgroundColor: colors.card }]}
+              style={[
+                styles.accountTypeCard,
+                { backgroundColor: colors.card, borderColor: selected ? colors.button : colors.border },
+                selected && { backgroundColor: colors.accent },
+              ]}
             >
-              <Feather name={type === 'business' ? 'briefcase' : 'user'} size={16} color={selected ? colors.foreground : colors.mutedForeground} />
-              <Text style={[styles.segmentText, { color: selected ? colors.foreground : colors.mutedForeground }]}>
-                {type === 'business' ? 'Business' : 'Individual'}
-              </Text>
+              <View style={[styles.accountTypeIcon, { backgroundColor: selected ? colors.button : colors.muted }]}>
+                <Feather name={type === 'business' ? 'briefcase' : 'user'} size={18} color={selected ? colors.buttonForeground : colors.mutedForeground} />
+              </View>
+              <View style={styles.accountTypeCopy}>
+                <Text style={[styles.accountTypeTitle, { color: colors.foreground }]}>{type === 'business' ? 'Business' : 'Individual'}</Text>
+                <Text style={[styles.accountTypeDescription, { color: colors.mutedForeground }]}>
+                  {type === 'business' ? 'For your shop or trade' : 'For personal use'}
+                </Text>
+              </View>
+              <View style={[styles.selectionIndicator, { borderColor: selected ? colors.button : colors.border, backgroundColor: selected ? colors.button : 'transparent' }]}>
+                {selected ? <Feather name="check" size={12} color={colors.buttonForeground} /> : null}
+              </View>
             </HapticPressable>
           );
         })}
       </View>
-      <Text style={[styles.formLabel, { color: colors.foreground }]}>{accountType === 'business' ? 'BUSINESS OR TRADING NAME' : 'FULL NAME'}</Text>
-      <TextInput
-        value={name}
-        onChangeText={(value) => { setName(value); setError(''); }}
-        placeholder={accountType === 'business' ? 'e.g. Lungile’s Spaza' : 'e.g. Lungile Mokoena'}
-        placeholderTextColor={colors.mutedForeground}
-        autoCapitalize="words"
-        style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-      />
+      <View style={styles.registrationFieldGroup}>
+        <Text style={[styles.registrationFieldLabel, { color: colors.foreground }]}>
+          {accountType === 'business' ? 'BUSINESS OR TRADING NAME' : 'FULL NAME'}
+        </Text>
+        <View style={[styles.registrationInputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Feather name={accountType === 'business' ? 'briefcase' : 'user'} size={18} color={colors.mutedForeground} />
+          <TextInput
+            value={name}
+            onChangeText={(value) => { setName(value); setError(''); }}
+            placeholder={accountType === 'business' ? 'e.g. Lungile’s Spaza' : 'e.g. Lungile Mokoena'}
+            placeholderTextColor={colors.mutedForeground}
+            autoCapitalize="words"
+            style={[styles.registrationInput, { color: colors.foreground }]}
+            returnKeyType="next"
+          />
+        </View>
+      </View>
       {accountType === 'business' ? (
-        <>
-          <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 20 }]}>TYPE OF BUSINESS</Text>
-          <View style={styles.categoryGrid}>
+        <View style={styles.registrationFieldGroup}>
+          <Text style={[styles.registrationFieldLabel, { color: colors.foreground }]}>TYPE OF BUSINESS</Text>
+          <View style={styles.registrationCategoryGrid}>
             {businessCategories.map((item) => {
               const selected = category === item;
               return (
                 <HapticPressable
                   key={item}
                   onPress={() => setCategory(item)}
-                  style={[styles.categoryChip, { backgroundColor: selected ? colors.active : colors.card, borderColor: selected ? colors.active : colors.border }]}
+                  style={[
+                    styles.registrationCategoryCard,
+                    { backgroundColor: colors.card, borderColor: selected ? colors.button : colors.border },
+                    selected && { backgroundColor: colors.accent },
+                  ]}
                 >
-                  <Text style={[styles.categoryChipText, { color: selected ? colors.activeForeground : colors.foreground }]}>{item}</Text>
+                  <Feather name={businessCategoryIcons[item]} size={16} color={selected ? colors.button : colors.mutedForeground} />
+                  <Text style={[styles.registrationCategoryText, { color: colors.foreground }]}>{item}</Text>
+                  {selected ? <Feather name="check-circle" size={15} color={colors.button} /> : null}
                 </HapticPressable>
               );
             })}
           </View>
-        </>
-      ) : null}
-      <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 20 }]}>MOBILE NUMBER</Text>
-      <TextInput
-        value={phone}
-        onChangeText={(value) => { setPhone(value); setError(''); }}
-        placeholder="+27 72 555 0198"
-        placeholderTextColor={colors.mutedForeground}
-        keyboardType="phone-pad"
-        style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-      />
-      <View style={styles.registrationPinRow}>
-        <View style={styles.registrationPinField}>
-          <Text style={[styles.formLabel, { color: colors.foreground }]}>6-DIGIT PIN</Text>
-          <TextInput
-            value={pin}
-            onChangeText={(value) => { setPin(value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
-            placeholder="••••••"
-            placeholderTextColor={colors.mutedForeground}
-            keyboardType="number-pad"
-            secureTextEntry
-            maxLength={6}
-            style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
-          />
         </View>
-        <View style={styles.registrationPinField}>
-          <Text style={[styles.formLabel, { color: colors.foreground }]}>CONFIRM PIN</Text>
+      ) : null}
+      <View style={styles.registrationFieldGroup}>
+        <Text style={[styles.registrationFieldLabel, { color: colors.foreground }]}>MOBILE NUMBER</Text>
+        <View style={[styles.registrationInputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Feather name="smartphone" size={18} color={colors.mutedForeground} />
           <TextInput
-            value={confirmPin}
-            onChangeText={(value) => { setConfirmPin(value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
-            placeholder="••••••"
+            value={phone}
+            onChangeText={(value) => { setPhone(value); setError(''); }}
+            placeholder="+27 72 555 0198"
             placeholderTextColor={colors.mutedForeground}
-            keyboardType="number-pad"
-            secureTextEntry
-            maxLength={6}
-            style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]}
+            keyboardType="phone-pad"
+            style={[styles.registrationInput, { color: colors.foreground }]}
+            returnKeyType="next"
           />
         </View>
       </View>
-      {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
-      <HapticPressable onPress={() => void submit()} style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 22 }]}>
+      <View style={styles.registrationPinSection}>
+        <View style={styles.registrationPinHeading}>
+          <View>
+            <Text style={[styles.registrationSectionTitle, { color: colors.foreground }]}>Create a 6-digit PIN</Text>
+            <Text style={[styles.registrationSectionHint, { color: colors.mutedForeground }]}>You’ll use this to approve transactions.</Text>
+          </View>
+          <Feather name="lock" size={18} color={colors.button} />
+        </View>
+        <View style={styles.registrationPinRow}>
+          {[
+            { label: '6-DIGIT PIN', value: pin, update: setPin, testID: 'registration-pin' },
+            { label: 'CONFIRM PIN', value: confirmPin, update: setConfirmPin, testID: 'registration-confirm-pin' },
+          ].map((field) => (
+            <View key={field.label} style={styles.registrationPinField}>
+              <Text style={[styles.registrationFieldLabel, { color: colors.mutedForeground }]}>{field.label}</Text>
+              <View style={[styles.registrationInputShell, styles.registrationPinInputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                <TextInput
+                  value={field.value}
+                  onChangeText={(value) => { field.update(value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+                  placeholder="6 digits"
+                  placeholderTextColor={colors.mutedForeground}
+                  keyboardType="number-pad"
+                  secureTextEntry={!showPin}
+                  maxLength={6}
+                  style={[styles.registrationInput, styles.registrationPinInput, { color: colors.foreground }]}
+                  testID={field.testID}
+                />
+                <HapticPressable onPress={() => setShowPin((visible) => !visible)} style={styles.pinVisibilityButton}>
+                  <Feather name={showPin ? 'eye-off' : 'eye'} size={17} color={colors.mutedForeground} />
+                </HapticPressable>
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+      {error ? (
+        <View style={[styles.registrationError, { backgroundColor: colors.destructive + '12' }]}>
+          <Feather name="alert-circle" size={17} color={colors.destructive} />
+          <Text style={[styles.registrationErrorText, { color: colors.destructive }]}>{error}</Text>
+        </View>
+      ) : null}
+      <HapticPressable onPress={() => void submit()} style={[styles.registrationSubmitButton, { backgroundColor: colors.button }]}>
+        <Feather name="shield" size={18} color={colors.buttonForeground} />
+        <Text style={[styles.registrationSubmitText, { color: colors.buttonForeground }]}>Create account</Text>
         <Feather name="arrow-right" size={18} color={colors.buttonForeground} />
-        <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Create account</Text>
       </HapticPressable>
-      <Text style={[styles.registrationNote, { color: colors.mutedForeground }]}>
-        Your account details and PIN are stored on this device in this prototype.
-      </Text>
+      <View style={[styles.registrationNoteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Feather name="info" size={16} color={colors.mutedForeground} />
+        <Text style={[styles.registrationNote, { color: colors.mutedForeground }]}>
+          Prototype notice: your account details and PIN are stored on this device.
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -1723,11 +1781,6 @@ const styles = StyleSheet.create({
   splashScroll: { flex: 1, width: '100%' },
   splashRoot: { flexGrow: 1, alignItems: 'stretch', justifyContent: 'space-between', gap: 24, paddingHorizontal: 24, width: '100%', maxWidth: 480, alignSelf: 'center' },
   splashRootCompact: { gap: 14 },
-  splashTopline: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  splashIdentity: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  splashBrandName: { fontFamily: 'Roboto_700Bold', fontSize: 16, letterSpacing: 2.2 },
-  splashTagline: { fontFamily: 'Roboto_500Medium', fontSize: 10, letterSpacing: 1.4, marginTop: 2 },
-  splashSecureBadge: { width: 38, height: 38, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   splashHero: { alignItems: 'center', width: '100%' },
   splashHeroCompact: { flexShrink: 0 },
   splashArtwork: { width: 224, height: 204, alignItems: 'center', justifyContent: 'center', position: 'relative', marginBottom: 22 },
@@ -1769,13 +1822,47 @@ const styles = StyleSheet.create({
   errorText: { fontFamily: 'Roboto_500Medium', fontSize: 12, textAlign: 'center', marginTop: 7, maxWidth: 290 },
   registerLink: { padding: 10, marginTop: 5 },
   registerLinkText: { fontFamily: 'Roboto_500Medium', fontSize: 12 },
-  registrationRoot: { paddingHorizontal: 18 },
-  registrationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 },
-  registrationTitle: { fontFamily: 'Roboto_700Bold', fontSize: 28, marginTop: 8, textAlign: 'center' },
-  registrationSubtitle: { fontFamily: 'Roboto_400Regular', fontSize: 14, lineHeight: 20, marginTop: 9, maxWidth: 330, textAlign: 'center' },
-  registrationPinRow: { flexDirection: 'row', gap: 10, marginTop: 20 },
+  registrationRoot: { paddingHorizontal: 20, width: '100%', maxWidth: 520, alignSelf: 'center' },
+  registrationHeader: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 27 },
+  registrationBackButton: { width: 44, height: 44, borderRadius: 15, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
+  registrationProgress: { flex: 1, alignItems: 'center', gap: 7 },
+  registrationProgressTrack: { width: '100%', maxWidth: 160, height: 4, borderRadius: 2 },
+  registrationProgressFill: { width: '100%', height: 4, borderRadius: 2 },
+  registrationProgressText: { fontFamily: 'Roboto_700Bold', fontSize: 9, letterSpacing: 1.3 },
+  registrationIntro: { alignItems: 'flex-start', marginBottom: 28 },
+  registrationEyebrow: { flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 7 },
+  registrationTitle: { fontFamily: 'Roboto_700Bold', fontSize: 29, letterSpacing: -0.4, marginTop: 13 },
+  registrationSubtitle: { fontFamily: 'Roboto_400Regular', fontSize: 14, lineHeight: 20, marginTop: 7, maxWidth: 360 },
+  registrationSection: { marginBottom: 13 },
+  registrationSectionTitle: { fontFamily: 'Roboto_700Bold', fontSize: 15 },
+  registrationSectionHint: { fontFamily: 'Roboto_400Regular', fontSize: 12, lineHeight: 17, marginTop: 4 },
+  accountTypeOptions: { flexDirection: 'row', gap: 10, marginBottom: 24 },
+  accountTypeCard: { flex: 1, minHeight: 96, borderWidth: 1, borderRadius: 17, alignItems: 'flex-start', justifyContent: 'center', gap: 8, paddingHorizontal: 11, paddingVertical: 11 },
+  accountTypeIcon: { width: 32, height: 32, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  accountTypeCopy: { alignSelf: 'stretch', paddingRight: 18 },
+  accountTypeTitle: { fontFamily: 'Roboto_700Bold', fontSize: 13 },
+  accountTypeDescription: { fontFamily: 'Roboto_400Regular', fontSize: 10, lineHeight: 14, marginTop: 3 },
+  selectionIndicator: { position: 'absolute', top: 11, right: 11, width: 19, height: 19, borderRadius: 10, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
+  registrationFieldGroup: { marginBottom: 19 },
+  registrationFieldLabel: { fontFamily: 'Roboto_700Bold', fontSize: 10, letterSpacing: 1.1, marginBottom: 8 },
+  registrationInputShell: { minHeight: 54, borderWidth: 1, borderRadius: 15, flexDirection: 'row', alignItems: 'center', gap: 11, paddingHorizontal: 14 },
+  registrationInput: { flex: 1, minWidth: 0, minHeight: 50, paddingVertical: 0, fontFamily: 'Roboto_400Regular', fontSize: 14 },
+  registrationCategoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  registrationCategoryCard: { width: '48.5%', minHeight: 45, borderWidth: 1, borderRadius: 13, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 9, paddingVertical: 8 },
+  registrationCategoryText: { flex: 1, fontFamily: 'Roboto_500Medium', fontSize: 11, lineHeight: 15 },
+  registrationPinSection: { marginTop: 1 },
+  registrationPinHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 13 },
+  registrationPinRow: { flexDirection: 'row', gap: 10 },
   registrationPinField: { flex: 1 },
-  registrationNote: { fontFamily: 'Roboto_400Regular', fontSize: 11, lineHeight: 16, textAlign: 'center', marginTop: 13, paddingHorizontal: 18 },
+  registrationPinInputShell: { gap: 2, paddingHorizontal: 10 },
+  registrationPinInput: { textAlign: 'center', fontSize: 13 },
+  pinVisibilityButton: { width: 30, height: 38, alignItems: 'center', justifyContent: 'center' },
+  registrationError: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 13, paddingHorizontal: 12, paddingVertical: 11, marginTop: 15 },
+  registrationErrorText: { flex: 1, fontFamily: 'Roboto_500Medium', fontSize: 12, lineHeight: 17 },
+  registrationSubmitButton: { minHeight: 58, borderRadius: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 19, marginTop: 23, shadowColor: '#006F70', shadowOpacity: 0.17, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  registrationSubmitText: { flex: 1, fontFamily: 'Roboto_700Bold', fontSize: 15, textAlign: 'center' },
+  registrationNoteCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderWidth: 1, borderRadius: 14, padding: 13, marginTop: 14 },
+  registrationNote: { flex: 1, fontFamily: 'Roboto_400Regular', fontSize: 11, lineHeight: 16 },
   pinPad: { width: '100%', maxWidth: 330, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
   pinKey: { width: 92, height: 53, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
   pinKeyCircle: { borderRadius: 30 },
