@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "pnpm exec expo start --localhost",
     "build": "node scripts/build.js",
-    "build:web": "npx expo export --platform web",
+    "build:web": "pnpm exec expo export --platform web && node scripts/fix-netlify-assets.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

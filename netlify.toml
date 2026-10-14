@@ -1,5 +1,5 @@
 [build]
-  command = "cd artifacts/paymerch-mobile && pnpm install && npx expo export --platform web"
+  command = "cd artifacts/paymerch-mobile && pnpm install && pnpm run build:web"
   publish = "artifacts/paymerch-mobile/dist"
 
 [build.environment]
