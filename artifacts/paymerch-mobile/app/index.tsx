@@ -126,14 +126,20 @@ const buildQrPayload = (request: PaymentRequest, name: string): QrPayload => ({
 });
 
 const decodeQrPayload = (data: string): QrPayload | null => {
-  if (!data || !data.startsWith(QR_PREFIX)) return null;
+  if (!data || data.length > 2048 || !data.startsWith(QR_PREFIX)) return null;
   try {
     const obj = JSON.parse(decodeURIComponent(data.slice(QR_PREFIX.length)));
     if (
       obj &&
       typeof obj.token === 'string' &&
+      obj.token.length > 0 &&
+      obj.token.length <= 128 &&
       typeof obj.amount === 'number' &&
-      typeof obj.expiresAt === 'number'
+      Number.isFinite(obj.amount) &&
+      typeof obj.expiresAt === 'number' &&
+      Number.isFinite(obj.expiresAt) &&
+      typeof obj.name === 'string' &&
+      obj.name.length <= 100
     ) {
       return obj as QrPayload;
     }
@@ -556,17 +562,8 @@ function AppSplashScreen({
           <View style={[styles.splashOrbInner, compactLayout && styles.splashOrbInnerCompact, { backgroundColor: colors.card }]}>
             <LogoIcon size={compactLayout ? 58 : 76} />
           </View>
-          <View style={[styles.splashFloatingIcon, styles.splashFloatingTop, { backgroundColor: colors.card }]}>
-            <Feather name="check" size={17} color={colors.accentForeground} />
-          </View>
-          <View style={[styles.splashFloatingIcon, styles.splashFloatingBottom, { backgroundColor: colors.button }]}>
-            <Feather name="credit-card" size={17} color={colors.buttonForeground} />
-          </View>
         </View>
         <Text style={[styles.splashEyebrow, { color: colors.accentForeground }]}>SIMPLY SECURE PAYMENTS</Text>
-        <Text style={[styles.splashHeadline, compactLayout && styles.splashHeadlineCompact, { color: colors.foreground }]}>
-          Payments that move you forward.
-        </Text>
         <Text style={[styles.splashDescription, { color: colors.mutedForeground }]}>
           Pay, get paid and manage your business wallet, even when you are offline.
         </Text>
@@ -1064,7 +1061,7 @@ function BalanceCard({ balance, online, onToggle, label }: { balance: number; on
         <Text style={styles.balanceFoot}>Available balance · ZAR</Text>
         <View style={styles.secureBadge}>
           <Feather name="shield" size={12} color="#A7F3D0" />
-          <Text style={styles.secureBadgeText}>{online ? 'Synced' : 'Pending sync'}</Text>
+          <Text style={styles.secureBadgeText}>{online ? 'Demo mode' : 'Saved locally'}</Text>
         </View>
       </View>
     </View>
@@ -1179,7 +1176,7 @@ function HomeScreen({
           <Feather name="wifi-off" size={17} color={colors.warning} />
           <View style={styles.offlineCopy}>
             <Text style={[styles.offlineTitle, { color: colors.foreground }]}>You’re offline</Text>
-            <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>New scans stay encrypted and sync when you reconnect.</Text>
+            <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>QR demo transactions are saved on this device. No server sync is configured.</Text>
           </View>
         </View>
       ) : null}
@@ -1342,7 +1339,9 @@ function PayScreen({ onBack }: { onBack: () => void }) {
               <Feather name="clock" size={15} color={colors.warning} />
               <Text style={[styles.timerText, { color: colors.warning }]}>{seconds}s remaining</Text>
             </View>
-            <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>Show this code to the seller. It can only be used once.</Text>
+            <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>
+              Local demo only. Scanning records a one-time transfer on the scanner device; no real money moves.
+            </Text>
             <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{activeRequest?.token ?? 'tok_demo_pm'}</Text>
           </View>
         </View>
@@ -1364,19 +1363,17 @@ function PayScreen({ onBack }: { onBack: () => void }) {
 function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (screen: Screen) => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { paymentRequest, completePayment, online, biometricAvailable, biometricLabel } = useWallet();
+  const { completePayment, online, biometricAvailable, biometricLabel } = useWallet();
 
   const [permissionResponse, requestPermission] = useCameraPermissions();
   const [asked, setAsked] = useState(false);
-  const [result, setResult] = useState<'idle' | 'success' | 'offline'>('idle');
+  const [result, setResult] = useState<'idle' | 'success'>('idle');
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [pinError, setPinError] = useState('');
   const [scannedPayload, setScannedPayload] = useState<QrPayload | null>(null);
   const [scanned, setScanned] = useState(false);
   const [scanError, setScanError] = useState('');
   const [cameraError, setCameraError] = useState(false);
-
-  const hasRequest = Boolean(paymentRequest && paymentRequest.expiresAt > Date.now());
 
   useEffect(() => {
     // Native platforms request the camera permission up front. On web the
@@ -1395,17 +1392,12 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
   };
 
   const processPayload = (payload: QrPayload) => {
-    if (!hasRequest || !paymentRequest || paymentRequest.token !== payload.token) {
-      setScanError('QR could not be verified against an active request.');
-      setScanned(false);
-      return;
-    }
-    if (payload.expiresAt < Date.now()) {
+    if (payload.expiresAt <= Date.now()) {
       setScanError('This QR has expired.');
       setScanned(false);
       return;
     }
-    if (payload.amount <= 0) {
+    if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
       setScanError('This request is invalid.');
       setScanned(false);
       return;
@@ -1428,16 +1420,27 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 
   const handlePinConfirm = (auth: TransactionAuth) => {
     if (!scannedPayload) return;
-    const success = completePayment(scannedPayload.amount, 'QR', auth);
-    if (success) {
-      setResult(online ? 'success' : 'offline');
+    const outcome = completePayment(scannedPayload, scannedPayload.name, auth);
+    if (outcome === 'SUCCESS') {
+      setResult('success');
       setPinModalVisible(false);
       setPinError('');
-      void Haptics.notificationAsync(
-        online ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning,
-      );
-    } else {
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else if (outcome === 'INVALID_AUTH') {
       setPinError('Invalid PIN. Please try again.');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } else {
+      const messages = {
+        INVALID_REQUEST: 'This QR payment request is invalid.',
+        EXPIRED: 'This QR has expired. Ask the customer to create a new one.',
+        INSUFFICIENT_BALANCE: 'The local demo payer balance is too low for this payment.',
+        ALREADY_USED: 'This QR has already been used on this device.',
+      } as const;
+      setPinModalVisible(false);
+      setPinError('');
+      setScannedPayload(null);
+      setScanned(false);
+      setScanError(messages[outcome]);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
@@ -1445,14 +1448,12 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
   if (result !== 'idle') {
     return (
       <View style={[styles.successRoot, { backgroundColor: colors.background, paddingTop: insets.top + 18 }]}>
-        <View style={[styles.successMark, { backgroundColor: result === 'success' ? colors.accent : colors.warm }]}>
-          <Feather name={result === 'success' ? 'check' : 'clock'} size={34} color={result === 'success' ? colors.success : colors.warning} />
+        <View style={[styles.successMark, { backgroundColor: colors.accent }]}>
+          <Feather name="check" size={34} color={colors.success} />
         </View>
-        <Text style={[styles.successTitle, { color: colors.foreground }]}>{result === 'success' ? 'Payment received' : 'Payment saved for sync'}</Text>
+        <Text style={[styles.successTitle, { color: colors.foreground }]}>Local payment recorded</Text>
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
-          {result === 'success'
-            ? 'The customer and business wallets are updated.'
-            : 'This payment is encrypted on-device and will sync when you reconnect.'}
+          The local demo payer balance was debited and business balance credited on this device. No real money moved.
         </Text>
         <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, { backgroundColor: colors.button }]}>
           <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Back to dashboard</Text>
@@ -1475,9 +1476,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
     ? 'Could not start the camera. Check camera access and try again.'
     : !permissionResponse?.granted
       ? 'Allow camera access to scan a customer QR code.'
-      : hasRequest
-        ? 'Point your camera at the customer’s QR code.'
-        : 'Waiting for a customer payment request.';
+      : 'Point your camera at an active Paymerch demo QR code.';
 
   return (
     <View style={[styles.scannerRoot, { backgroundColor: colors.dark, paddingTop: insets.top + 18, paddingBottom: insets.bottom + 18 }]}>
@@ -1526,9 +1525,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           {scannedPayload ? 'Customer payment detected' : canUseCamera ? 'Scan a customer payment QR' : 'Live QR scanner'}
         </Text>
         <Text style={styles.scannerSubhint}>
-          {hasRequest
-            ? `${zar(scannedPayload?.amount ?? paymentRequest?.amount ?? 0)} · Expires in 60 seconds`
-            : cameraStatus}
+          {scannedPayload ? `${zar(scannedPayload.amount)} · ${scannedPayload.name}` : cameraStatus}
         </Text>
       </View>
 
@@ -1547,7 +1544,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         </HapticPressable>
       )}
       <Text style={styles.scannerFootnote}>
-        {canUseCamera ? 'Scanning live camera feed for Paymerch QR codes' : 'Payments can only be collected by scanning a valid QR code.'}
+        {canUseCamera
+          ? 'Local demo only: confirms a one-time QR and updates balances on this device. No real money moves.'
+          : 'Payments can only be collected by scanning a valid, unexpired Paymerch demo QR.'}
       </Text>
       <PinConfirmationModal
         visible={pinModalVisible}
@@ -2025,12 +2024,7 @@ const styles = StyleSheet.create({
   splashOrbCompact: { width: 140, height: 140, borderRadius: 70 },
   splashOrbInner: { width: 150, height: 150, borderRadius: 75, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 5 },
   splashOrbInnerCompact: { width: 116, height: 116, borderRadius: 58 },
-  splashFloatingIcon: { position: 'absolute', width: 40, height: 40, borderRadius: 15, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.12, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
-  splashFloatingTop: { top: 19, right: 16 },
-  splashFloatingBottom: { bottom: 15, left: 16 },
   splashEyebrow: { fontFamily: 'Montserrat_700Bold', fontSize: 10, letterSpacing: 1.6, textAlign: 'center' },
-  splashHeadline: { fontFamily: 'Montserrat_700Bold', fontSize: 29, lineHeight: 35, letterSpacing: -0.5, textAlign: 'center', marginTop: 10, maxWidth: 340 },
-  splashHeadlineCompact: { fontSize: 25, lineHeight: 30 },
   splashDescription: { fontFamily: 'Montserrat_400Regular', fontSize: 14, lineHeight: 21, textAlign: 'center', marginTop: 10, maxWidth: 330 },
   splashFooter: { gap: 17 },
   splashFooterCompact: { gap: 10 },

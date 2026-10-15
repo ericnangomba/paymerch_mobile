@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 
@@ -30,6 +30,7 @@ export type UserProfile = {
 
 export type Transaction = {
   id: string;
+  reference?: string;
   kind: TransactionKind;
   title: string;
   subtitle: string;
@@ -44,6 +45,14 @@ export type PaymentRequest = {
   amount: number;
   expiresAt: number;
 };
+
+export type CompletePaymentResult =
+  | 'SUCCESS'
+  | 'INVALID_AUTH'
+  | 'INVALID_REQUEST'
+  | 'EXPIRED'
+  | 'INSUFFICIENT_BALANCE'
+  | 'ALREADY_USED';
 
 /**
  * Authentication supplied before a transaction is authorized.
@@ -64,6 +73,7 @@ type PersistedWallet = {
   transactions: Transaction[];
   online: boolean;
   paymentRequest: PaymentRequest | null;
+  usedPaymentTokens?: string[];
   businessCategory?: BusinessCategory;
   profile?: UserProfile;
   pin?: string;
@@ -90,7 +100,11 @@ type WalletContextValue = {
   toggleOnline: () => void;
   syncPending: () => void;
   createPaymentRequest: (amount: number, auth: TransactionAuth) => PaymentRequest | null;
-  completePayment: (amount: number, source?: 'QR' | 'DEMO', auth?: TransactionAuth) => boolean;
+  completePayment: (
+    request: PaymentRequest,
+    payerName: string,
+    auth?: TransactionAuth,
+  ) => CompletePaymentResult;
   vendVas: (kind: 'VAS_ELEC' | 'VAS_AIRTIME', amount: number, destination: string, auth: TransactionAuth) => string | null;
   cashOut: (amount: number, auth: TransactionAuth) => boolean;
   setBusinessCategory: (category: BusinessCategory) => void;
@@ -170,6 +184,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>(DEMO_TRANSACTIONS);
   const [online, setOnline] = useState(true);
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
+  const [usedPaymentTokens, setUsedPaymentTokens] = useState<string[]>([]);
+  const usedPaymentTokensRef = useRef(new Set<string>());
   const [businessCategory, setBusinessCategory] = useState<BusinessCategory>('Spaza shop');
   const [profile, setProfile] = useState<UserProfile>(DEFAULT_PROFILE);
   const [storedPin, setStoredPin] = useState<string | undefined>(undefined);
@@ -227,6 +243,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           setTransactions(wallet.transactions);
           setOnline(wallet.online);
           setPaymentRequest(wallet.paymentRequest);
+          const usedTokens = Array.isArray(wallet.usedPaymentTokens) ? wallet.usedPaymentTokens : [];
+          usedPaymentTokensRef.current = new Set(usedTokens);
+          setUsedPaymentTokens(usedTokens);
           setBusinessCategory(wallet.businessCategory ?? 'Spaza shop');
           setProfile(wallet.profile ?? DEFAULT_PROFILE);
           setStoredPin(wallet.pin);
@@ -252,12 +271,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       transactions,
       online,
       paymentRequest,
+      usedPaymentTokens,
       businessCategory,
       profile,
       pin: storedPin,
     };
     void AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(wallet));
-  }, [isRegistered, buyerBalance, merchantBalance, transactions, online, paymentRequest, businessCategory, profile, storedPin, ready]);
+  }, [isRegistered, buyerBalance, merchantBalance, transactions, online, paymentRequest, usedPaymentTokens, businessCategory, profile, storedPin, ready]);
 
   const login = useCallback(async (pin: string) => {
     // Check if user is registered
@@ -340,43 +360,84 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const createPaymentRequest = useCallback((amount: number, auth: TransactionAuth): PaymentRequest | null => {
     // Require PIN or biometric authorization for payment request creation
-    if (!authorize(auth)) {
+    if (
+      !authorize(auth) ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
+      Math.round(amount * 100) > Math.round(buyerBalance * 100)
+    ) {
       return null;
     }
     const request: PaymentRequest = {
       token: `tok_${makeId()}_pm`,
-      amount,
+      amount: Math.round(amount * 100) / 100,
       expiresAt: Date.now() + 60_000,
     };
     setPaymentRequest(request);
     return request;
-  }, [storedPin]);
+  }, [authorize, buyerBalance]);
 
   const completePayment = useCallback(
-    (amount: number, source: 'QR' | 'DEMO' = 'QR', auth?: TransactionAuth): boolean => {
-      // Require PIN or biometric authorization for transactions
-      if (!authorize(auth)) {
-        return false;
+    (request: PaymentRequest, payerName: string, auth?: TransactionAuth): CompletePaymentResult => {
+      if (!authorize(auth)) return 'INVALID_AUTH';
+      if (
+        !request ||
+        typeof request.token !== 'string' ||
+        request.token.length === 0 ||
+        !Number.isFinite(request.amount) ||
+        request.amount <= 0 ||
+        !Number.isFinite(request.expiresAt)
+      ) {
+        return 'INVALID_REQUEST';
       }
-      const safeAmount = Math.round(amount * 100) / 100;
-      if (safeAmount <= 0 || safeAmount > buyerBalance) return false;
-      const transaction: Transaction = {
+      if (request.expiresAt <= Date.now()) return 'EXPIRED';
+      if (usedPaymentTokensRef.current.has(request.token)) return 'ALREADY_USED';
+
+      const amountCents = Math.round(request.amount * 100);
+      const buyerBalanceCents = Math.round(buyerBalance * 100);
+      if (amountCents <= 0) return 'INVALID_REQUEST';
+      if (amountCents > buyerBalanceCents) return 'INSUFFICIENT_BALANCE';
+
+      const safeAmount = amountCents / 100;
+      const createdAt = Date.now();
+      const reference = request.token;
+      const status: TransactionStatus = 'SUCCESS';
+      const subtitle = 'Local QR demo';
+      const payer = payerName.trim() || 'Customer';
+      const sentTransaction: Transaction = {
         id: makeId(),
         kind: 'MERCHANT_PAY',
-        title: source === 'QR' ? 'Customer payment' : 'Demo customer payment',
-        subtitle: online ? 'QR payment · Just now' : 'QR payment · Saved offline',
+        title: 'QR payment sent',
+        subtitle: `${subtitle} · ${payer}`,
         amount: safeAmount,
-        status: online ? 'SUCCESS' : 'PENDING SYNC',
-        createdAt: Date.now(),
-        direction: 'in',
+        status,
+        createdAt,
+        direction: 'out',
+        reference,
       };
+      const receivedTransaction: Transaction = {
+        id: makeId(),
+        kind: 'MERCHANT_PAY',
+        title: 'QR payment received',
+        subtitle: `${subtitle} · ${payer}`,
+        amount: safeAmount,
+        status,
+        createdAt,
+        direction: 'in',
+        reference,
+      };
+
+      usedPaymentTokensRef.current.add(request.token);
+      setUsedPaymentTokens((current) =>
+        current.includes(request.token) ? current : [...current, request.token],
+      );
       setBuyerBalance((value) => Math.round((value - safeAmount) * 100) / 100);
       setMerchantBalance((value) => Math.round((value + safeAmount) * 100) / 100);
-      setTransactions((current) => [transaction, ...current]);
-      setPaymentRequest(null);
-      return true;
+      setTransactions((current) => [receivedTransaction, sentTransaction, ...current]);
+      setPaymentRequest((current) => (current?.token === request.token ? null : current));
+      return 'SUCCESS';
     },
-    [buyerBalance, online, storedPin],
+    [authorize, buyerBalance],
   );
 
   const vendVas = useCallback(
