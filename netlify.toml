@@ -1,10 +1,15 @@
 [build]
-  command = "cd artifacts/paymerch-mobile && pnpm install && pnpm run build:web"
+  command = "pnpm install && pnpm run build:function && cd artifacts/paymerch-mobile && pnpm run build:web"
   publish = "artifacts/paymerch-mobile/dist"
 
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
 
 [[redirects]]
   from = "/*"

@@ -78,6 +78,9 @@ importers:
       prettier:
         specifier: ^3.9.6
         version: 3.9.6
+      serverless-http:
+        specifier: ^4.0.0
+        version: 4.0.0
       typescript:
         specifier: ~5.9.3
         version: 5.9.3
@@ -108,6 +111,9 @@ importers:
       pino-http:
         specifier: ^10.5.0
         version: 10.5.0
+      serverless-http:
+        specifier: ^4.0.0
+        version: 4.0.0
     devDependencies:
       '@electric-sql/pglite':
         specifier: ^0.5.15
@@ -5389,6 +5395,10 @@ packages:
 
   server-only@0.0.1:
     resolution: {integrity: sha512-qepMx2JxAa5jjfzxG79yPPq+8BuFToHd1hm7kI+Z4zAq1ftQiP7HcxMhDDItrbtwVeLg/cY2JnKnrcFkmiswNA==}
+
+  serverless-http@4.0.0:
+    resolution: {integrity: sha512-KKl9h1+VApX9y2vHsVMogf906UXBwO3FDYiWPzqS0mCjEEx4Sx91JrssbWA7RN43HBuxrtoh8MkocZPvjyGnLg==}
+    engines: {node: '>=12.0'}
 
   set-blocking@2.0.0:
     resolution: {integrity: sha512-KiKBS8AnWGEyLzofFfmvKwpdPzqiy16LvQfK3yv/fVH7Bj13/wl3JSR1J+rfgRE9q7xUJK4qvgS8raSOeLUehw==}
@@ -11518,6 +11528,8 @@ snapshots:
       - supports-color
 
   server-only@0.0.1: {}
+
+  serverless-http@4.0.0: {}
 
   set-blocking@2.0.0: {}
 
