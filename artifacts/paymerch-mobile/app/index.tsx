@@ -869,7 +869,7 @@ function Header({
             {online ? 'Online' : 'Offline'}
           </Text>
         </View>
-        <HapticPressable onPress={onSettings} style={styles.headerSettingsButton}>
+        <HapticPressable onPress={onSettings} style={styles.headerSettingsButton} testID="open-settings">
           <Feather name="sliders" size={18} color="#FFFFFF" />
         </HapticPressable>
       </View>
@@ -1131,7 +1131,12 @@ function PayScreen({ onBack }: { onBack: () => void }) {
     : null;
 
   return (
-    <View style={[styles.screenRoot, { backgroundColor: colors.background, paddingTop: insets.top + 18, paddingBottom: 34 }]}>
+    <ScrollView
+      style={[styles.screenRoot, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingTop: insets.top + 18, paddingBottom: insets.bottom + 120 }}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
       <View style={styles.pageHeader}>
         <HapticPressable onPress={onBack} style={styles.backButton}>
           <Feather name="arrow-left" size={21} color={colors.foreground} />
@@ -1216,7 +1221,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         error={pinError}
         onClearError={() => setPinError('')}
       />
-    </View>
+    </ScrollView>
   );
 }
 
