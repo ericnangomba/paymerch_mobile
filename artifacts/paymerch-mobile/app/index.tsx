@@ -199,6 +199,7 @@ function PinConfirmationModal({
   onClearError?: () => void;
 }) {
   const colors = useColors();
+  const insets = useSafeAreaInsets();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -244,6 +245,12 @@ function PinConfirmationModal({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
       <View style={styles.modalBackdrop}>
         <View style={[styles.pinSheet, { backgroundColor: colors.card }]}>
+          <ScrollView
+            style={styles.pinSheetScroll}
+            contentContainerStyle={[styles.pinSheetContent, { paddingBottom: Math.max(insets.bottom, 12) + 14 }]}
+            showsVerticalScrollIndicator={false}
+            bounces={false}
+          >
           <View style={styles.sheetHandle} />
           <View style={styles.pinModalHeader}>
             <View style={{ flex: 1, minWidth: 0 }}>
@@ -298,6 +305,7 @@ function PinConfirmationModal({
               </HapticPressable>
             </View>
           )}
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -370,7 +378,12 @@ function AuthScreen() {
   }
 
   const authContent = (
-    <View style={[styles.authRoot, { backgroundColor: colors.primary }]}>
+    <ScrollView
+      style={[styles.authRoot, { backgroundColor: colors.primary }]}
+      contentContainerStyle={styles.authScrollContent}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+    >
       <View style={styles.authTop}>
         <View style={styles.authLogoCircle}>
           <LogoIcon size={58} />
@@ -430,7 +443,7 @@ function AuthScreen() {
           <Feather name="shield" size={12} /> Your wallet is secured on this device
         </Text>
       </View>
-    </View>
+    </ScrollView>
   );
 
   // Add web container for proper centering on web
@@ -498,7 +511,7 @@ function AppSplashScreen({
 
   const splashContent = (
     <LinearGradient
-      colors={['#0B6E83', '#0E87A0', '#11A39B']}
+      colors={['#106080', '#2080A0', '#40B0B0']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.splashGradient}
@@ -530,7 +543,14 @@ function AppSplashScreen({
           <View style={[styles.splashCircle, compactLayout && styles.splashCircleCompact]}>
             <LogoIcon size={compactLayout ? 50 : 64} />
           </View>
-          <Text style={styles.splashWordmark}>paymerch</Text>
+          <View style={styles.splashWordmarkRow}>
+            <Text style={[styles.splashWordmark, styles.splashWordmarkPart]}>payme</Text>
+            <View style={styles.splashWordmarkR}>
+              <View style={styles.splashWordmarkDot} />
+              <Text style={[styles.splashWordmark, styles.splashWordmarkPart]}>r</Text>
+            </View>
+            <Text style={[styles.splashWordmark, styles.splashWordmarkPart]}>ch</Text>
+          </View>
           <Text style={styles.splashTagline}>Simply Secure Payments</Text>
         </Animated.View>
 
@@ -567,7 +587,7 @@ function AppSplashScreen({
 
           <HapticPressable onPress={onContinue} style={styles.splashPill} testID="splash-get-started">
             <Text style={styles.splashPillText}>Get started</Text>
-            <Feather name="arrow-right" size={18} color="#0E87A0" />
+            <Feather name="arrow-right" size={18} color="#2080A0" />
           </HapticPressable>
           {onInstall ? (
             <HapticPressable onPress={onInstall} style={styles.splashInstallAction} testID="splash-install">
@@ -946,7 +966,7 @@ function HomeScreen({
       contentContainerStyle={{ paddingBottom: 124 }}
     >
       <LinearGradient
-        colors={['#0B6E83', '#0E87A0']}
+        colors={['#106080', '#2080A0']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.homeBand, { paddingTop: insets.top + 18 }]}
@@ -1069,7 +1089,7 @@ function QRCode({ payload }: { payload: QrPayload }) {
 function PayScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buyerBalance, createPaymentRequest, paymentRequest, completePayment, profile } = useWallet();
+  const { buyerBalance, createPaymentRequest, paymentRequest, completePayment, profile, demoMode } = useWallet();
   const [amount, setAmount] = useState('');
   const [qrVisible, setQrVisible] = useState(false);
   const [seconds, setSeconds] = useState(60);
@@ -1183,7 +1203,9 @@ function PayScreen({ onBack }: { onBack: () => void }) {
               <Text style={[styles.timerText, { color: colors.warning }]}>{seconds}s remaining</Text>
             </View>
             <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>
-              Test money only. The trader's app verifies this code on the pilot server; no real money moves.
+              {demoMode
+                ? "Test money only. The trader's app verifies this code in the local demo on this device; no real money moves."
+                : "Test money only. The trader's app verifies this code on the pilot server; no real money moves."}
             </Text>
             <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{activeRequest?.token ?? 'tok_demo_pm'}</Text>
           </View>
@@ -1205,7 +1227,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
 function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (screen: Screen) => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { completePayment, previewPaymentRequest, online } = useWallet();
+  const { completePayment, previewPaymentRequest, online, demoMode } = useWallet();
 
   const [permissionResponse, requestPermission] = useCameraPermissions();
   const [asked, setAsked] = useState(false);
@@ -1338,7 +1360,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           </View>
         ) : null}
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
-          Test money moved from the customer's wallet to your business wallet on the pilot server. No real money moved.
+          {demoMode
+            ? "Test money moved from the customer's wallet to your business wallet in the local demo on this device. No real money moved."
+            : "Test money moved from the customer's wallet to your business wallet on the pilot server. No real money moved."}
         </Text>
         <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, styles.resultButton, { backgroundColor: colors.button }]}>
           <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Done</Text>
@@ -1454,7 +1478,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       )}
       <Text style={styles.scannerFootnote}>
         {canUseCamera
-          ? 'Test money only: the pilot server verifies the one-time QR and updates both wallets.'
+          ? demoMode
+            ? 'Test money only: the local demo on this device verifies the one-time QR and updates both wallets.'
+            : 'Test money only: the pilot server verifies the one-time QR and updates both wallets.'
           : 'Payments can only be collected by scanning a valid, unexpired Paymerch QR.'}
       </Text>
       <PinConfirmationModal
@@ -1946,7 +1972,8 @@ const styles = StyleSheet.create({
   splashInstallText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
   splashSecurityNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 1 },
   splashSecurityText: { fontFamily: 'Montserrat_400Regular', fontSize: 11, textAlign: 'center' },
-  authRoot: { flex: 1, justifyContent: 'space-between', maxWidth: 480, alignSelf: 'center', width: '100%' },
+  authRoot: { flex: 1, width: '100%' },
+  authScrollContent: { flexGrow: 1, justifyContent: 'space-between', maxWidth: 480, alignSelf: 'center', width: '100%' },
   authTop: { alignItems: 'center', paddingTop: 66, gap: 5, width: '100%' },
   brandName: { fontFamily: 'Montserrat_700Bold', fontSize: 16, letterSpacing: 3.4, textAlign: 'center' },
   tagline: { fontFamily: 'Montserrat_400Regular', fontSize: 13, textAlign: 'center' },
@@ -1954,7 +1981,7 @@ const styles = StyleSheet.create({
   authEyebrow: { fontFamily: 'Montserrat_700Bold', fontSize: 11, letterSpacing: 1.6, textAlign: 'center' },
   authTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 28, marginTop: 8, textAlign: 'center' },
   authSubtitle: { fontFamily: 'Montserrat_400Regular', fontSize: 14, marginTop: 9, textAlign: 'center' },
-  pinDots: { flexDirection: 'row', gap: 12, marginTop: 28, marginBottom: 14 },
+  pinDots: { flexDirection: 'row', gap: 12, marginTop: 20, marginBottom: 10 },
   pinDot: { width: 10, height: 10, borderRadius: 5 },
   errorText: { fontFamily: 'Montserrat_500Medium', fontSize: 12, textAlign: 'center', marginTop: 7, maxWidth: 290 },
   registerLink: { padding: 10, marginTop: 5 },
@@ -2030,7 +2057,7 @@ const styles = StyleSheet.create({
   registrationSubmitText: { flex: 1, fontFamily: 'Montserrat_700Bold', fontSize: 15, textAlign: 'center' },
   registrationNoteCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderWidth: 1, borderRadius: 14, padding: 13, marginTop: 14 },
   registrationNote: { flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 11, lineHeight: 16 },
-  pinPad: { width: '100%', maxWidth: 330, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
+  pinPad: { width: '100%', maxWidth: 330, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 6 },
   pinKey: { width: 74, height: 74, borderRadius: 37, alignItems: 'center', justifyContent: 'center' },
   pinKeyCircle: { borderRadius: 30 },
   pinKeyText: { fontFamily: 'Montserrat_500Medium', fontSize: 22 },
@@ -2062,7 +2089,7 @@ const styles = StyleSheet.create({
   pinSummary: { marginTop: 14, borderRadius: 13, paddingVertical: 11, paddingHorizontal: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   pinSummaryText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, textAlign: 'center' },
   pinModal: { borderRadius: 24, padding: 24, width: '90%', maxWidth: 360, alignSelf: 'center' },
-  pinModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
+  pinModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
   pinModalTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 20, marginTop: 4 },
   scanCta: { borderRadius: 22, minHeight: 112, padding: 18, marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   scanCtaCopy: { flex: 1, minWidth: 0 },
@@ -2204,6 +2231,10 @@ const styles = StyleSheet.create({
   splashCircle: { width: 112, height: 112, borderRadius: 56, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
   splashCircleCompact: { width: 92, height: 92, borderRadius: 46 },
   splashWordmark: { fontFamily: 'Montserrat_700Bold', fontSize: 34, color: '#FFFFFF', marginTop: 14, textAlign: 'center', letterSpacing: 0.5 },
+  splashWordmarkRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 14 },
+  splashWordmarkPart: { marginTop: 0 },
+  splashWordmarkR: { position: 'relative' },
+  splashWordmarkDot: { position: 'absolute', top: 5, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#E87018' },
   splashTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.82)', marginTop: 5, textAlign: 'center' },
   splashMiddle: { gap: 18, width: '100%' },
   splashMiddleCompact: { gap: 12 },
@@ -2233,7 +2264,9 @@ const styles = StyleSheet.create({
   secureBadgeLight: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 5 },
   secureBadgeTextLight: { fontFamily: 'Montserrat_500Medium', fontSize: 11 },
   sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: '#D8D8D3', alignSelf: 'center', marginBottom: 16 },
-  pinSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingTop: 14, width: '100%', maxWidth: 480, alignSelf: 'center', alignItems: 'center' },
+  pinSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, width: '100%', maxWidth: 480, alignSelf: 'center', maxHeight: '94%' },
+  pinSheetScroll: { width: '100%' },
+  pinSheetContent: { alignItems: 'center', padding: 24, paddingTop: 14 },
   processingBlock: { alignItems: 'center', gap: 12, paddingVertical: 34 },
   processingText: { fontFamily: 'Montserrat_500Medium', fontSize: 13 },
   resultButton: { alignSelf: 'stretch', marginTop: 20 },

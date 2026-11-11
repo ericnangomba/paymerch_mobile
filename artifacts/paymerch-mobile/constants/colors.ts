@@ -1,30 +1,30 @@
 /**
  * Semantic design tokens for the mobile app.
  *
- * PayMerch brand palette: teal-and-white clean payment style, derived from
- * the PayMerch logo (teal-blue #2080A0 family) and aligned to the reference
- * payment-flow art direction (teal primary, white cards, pill buttons).
+ * PayMerch brand palette sampled from Eric's official PayMerch Mobile logo
+ * assets: shield teal gradient (#107090 -> #2080A0 -> #40B0B0), wordmark
+ * deep blue #106080, neutral gray, and the orange accent dot #E87018.
  */
 
 const colors = {
   light: {
     text: '#0B1F2A',
-    tint: '#0E87A0',
+    tint: '#2080A0',
     background: '#F6FAFA',
     foreground: '#0B1F2A',
     card: '#FFFFFF',
     cardForeground: '#0B1F2A',
-    primary: '#0E87A0',
+    primary: '#2080A0',
     primaryForeground: '#FFFFFF',
     secondary: '#EAF3F5',
     secondaryForeground: '#0B1F2A',
     muted: '#EEF4F5',
     mutedForeground: '#5E737B',
     accent: '#DFF3F2',
-    accentForeground: '#0A6E66',
-    button: '#0DA39B',
+    accentForeground: '#106080',
+    button: '#2080A0',
     buttonForeground: '#FFFFFF',
-    active: '#FF6B35',
+    active: '#E87018',
     activeForeground: '#FFFFFF',
     destructive: '#D94841',
     destructiveForeground: '#FFFFFF',
@@ -38,12 +38,12 @@ const colors = {
   },
   dark: {
     text: '#FFFFFF',
-    tint: '#3EC6D2',
+    tint: '#40B0B0',
     background: '#07293D',
     foreground: '#FFFFFF',
     card: '#0E3549',
     cardForeground: '#FFFFFF',
-    primary: '#3EC6D2',
+    primary: '#40B0B0',
     primaryForeground: '#07293D',
     secondary: '#14455F',
     secondaryForeground: '#FFFFFF',
@@ -51,9 +51,9 @@ const colors = {
     mutedForeground: '#9EB9C4',
     accent: '#11484B',
     accentForeground: '#6EE7D8',
-    button: '#14B8AD',
+    button: '#2080A0',
     buttonForeground: '#FFFFFF',
-    active: '#FF8C5A',
+    active: '#E87018',
     activeForeground: '#07293D',
     destructive: '#F87171',
     destructiveForeground: '#07293D',
