@@ -1,8 +1,10 @@
 import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   Animated,
   Image,
   Modal,
@@ -239,18 +241,22 @@ function PinConfirmationModal({
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onCancel}>
       <View style={styles.modalBackdrop}>
-        <View style={[styles.pinModal, { backgroundColor: colors.card }]}>
+        <View style={[styles.pinSheet, { backgroundColor: colors.card }]}>
+          <View style={styles.sheetHandle} />
           <View style={styles.pinModalHeader}>
-            <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>SECURITY CHECK</Text>
-            <Text style={[styles.pinModalTitle, { color: colors.foreground }]}>{title}</Text>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>SECURITY CHECK</Text>
+              <Text style={[styles.pinModalTitle, { color: colors.foreground }]}>{title}</Text>
+            </View>
             <HapticPressable onPress={onCancel} style={styles.closeButton}>
               <Feather name="x" size={20} color={colors.foreground} />
             </HapticPressable>
           </View>
           {summary ? (
             <View style={[styles.pinSummary, { backgroundColor: colors.accent }]}>
+              <Feather name="arrow-right-circle" size={16} color={colors.accentForeground} />
               <Text style={[styles.pinSummaryText, { color: colors.accentForeground }]}>{summary}</Text>
             </View>
           ) : null}
@@ -266,25 +272,32 @@ function PinConfirmationModal({
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <View
                 key={index}
-                style={[styles.pinDot, { backgroundColor: index < pin.length ? colors.foreground : colors.border }]}
+                style={[styles.pinDot, { backgroundColor: index < pin.length ? colors.button : colors.border }]}
               />
             ))}
           </View>
           {displayError ? <Text style={[styles.errorText, { color: colors.destructive }]}>{displayError}</Text> : null}
-          <View style={styles.pinPad}>
-            {keys.map((key) => (
-              <HapticPressable key={key} onPress={() => void handleDigit(key)} style={styles.pinKey}>
-                <Text style={[styles.pinKeyText, { color: colors.foreground }]}>{key}</Text>
+          {isProcessing ? (
+            <View style={styles.processingBlock}>
+              <ActivityIndicator size="large" color={colors.button} />
+              <Text style={[styles.processingText, { color: colors.mutedForeground }]}>Processing payment…</Text>
+            </View>
+          ) : (
+            <View style={styles.pinPad}>
+              {keys.map((key) => (
+                <HapticPressable key={key} onPress={() => void handleDigit(key)} style={[styles.pinKey, { backgroundColor: colors.muted }]}>
+                  <Text style={[styles.pinKeyText, { color: colors.foreground }]}>{key}</Text>
+                </HapticPressable>
+              ))}
+              <View style={[styles.pinKey, { backgroundColor: 'transparent' }]} />
+              <HapticPressable onPress={() => void handleDigit('0')} style={[styles.pinKey, { backgroundColor: colors.muted }]}>
+                <Text style={[styles.pinKeyText, { color: colors.foreground }]}>0</Text>
               </HapticPressable>
-            ))}
-            <View style={styles.pinKey} />
-            <HapticPressable onPress={() => void handleDigit('0')} style={styles.pinKey}>
-              <Text style={[styles.pinKeyText, { color: colors.foreground }]}>0</Text>
-            </HapticPressable>
-            <HapticPressable onPress={handleDelete} style={styles.pinKey}>
-              <Feather name="delete" size={21} color={colors.foreground} />
-            </HapticPressable>
-          </View>
+              <HapticPressable onPress={handleDelete} style={[styles.pinKey, { backgroundColor: colors.muted }]}>
+                <Feather name="delete" size={21} color={colors.foreground} />
+              </HapticPressable>
+            </View>
+          )}
         </View>
       </View>
     </Modal>
@@ -357,23 +370,25 @@ function AuthScreen() {
   }
 
   const authContent = (
-    <View style={[styles.authRoot, { backgroundColor: colors.background }]}>
+    <View style={[styles.authRoot, { backgroundColor: colors.primary }]}>
       <View style={styles.authTop}>
-        <BrandMark size={120} />
-        <Text style={[styles.brandName, { color: colors.foreground }]}>PAYMERCH MOBILE</Text>
-        <Text style={[styles.tagline, { color: colors.mutedForeground }]}>Simply Secure Payments</Text>
+        <View style={styles.authLogoCircle}>
+          <LogoIcon size={58} />
+        </View>
+        <Text style={styles.authWordmark}>paymerch</Text>
+        <Text style={styles.authTagline}>Simply Secure Payments</Text>
       </View>
-      <View style={styles.authBody}>
+      <View style={[styles.authSheet, { backgroundColor: colors.card }]}>
         <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>WELCOME BACK</Text>
         <Text style={[styles.authTitle, { color: colors.foreground }]}>Enter your PIN</Text>
         <Text style={[styles.authSubtitle, { color: colors.mutedForeground }]}>
-          Unlock your wallet to continue.
+          Confirm your PIN to pay and unlock your wallet.
         </Text>
         <View style={styles.pinDots}>
           {[0, 1, 2, 3, 4, 5].map((index) => (
             <View
               key={index}
-              style={[styles.pinDot, { backgroundColor: index < pin.length ? colors.foreground : colors.border }]}
+              style={[styles.pinDot, { backgroundColor: index < pin.length ? colors.button : colors.border }]}
             />
           ))}
         </View>
@@ -381,29 +396,29 @@ function AuthScreen() {
         {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
         <View style={styles.pinPad}>
           {keys.map((key) => (
-            <HapticPressable key={key} testID={`pin-${key}`} onPress={() => void enterDigit(key)} style={styles.pinKey}>
+            <HapticPressable key={key} testID={`pin-${key}`} onPress={() => void enterDigit(key)} style={[styles.pinKey, { backgroundColor: colors.muted }]}>
               <Text style={[styles.pinKeyText, { color: colors.foreground }]}>{key}</Text>
             </HapticPressable>
           ))}
-          <HapticPressable onPress={() => void handleBiometricUnlock()} style={styles.pinKey}>
+          <HapticPressable onPress={() => void handleBiometricUnlock()} style={[styles.pinKey, { backgroundColor: colors.muted }]}>
             <Feather name="lock" size={20} color={colors.foreground} />
           </HapticPressable>
-          <HapticPressable onPress={() => void enterDigit('0')} style={styles.pinKey}>
+          <HapticPressable onPress={() => void enterDigit('0')} style={[styles.pinKey, { backgroundColor: colors.muted }]}>
             <Text style={[styles.pinKeyText, { color: colors.foreground }]}>0</Text>
           </HapticPressable>
-          <HapticPressable onPress={deleteDigit} style={styles.pinKey}>
+          <HapticPressable onPress={deleteDigit} style={[styles.pinKey, { backgroundColor: colors.muted }]}>
             <Feather name="delete" size={21} color={colors.foreground} />
           </HapticPressable>
         </View>
         {biometricAvailable ? (
           <HapticPressable onPress={() => void handleBiometricUnlock()} style={styles.biometricButton}>
-            <Feather name="smartphone" size={17} color={colors.foreground} />
-            <Text style={[styles.biometricText, { color: colors.foreground }]}>{biometricLabel}</Text>
+            <Feather name="smartphone" size={17} color={colors.primary} />
+            <Text style={[styles.biometricText, { color: colors.primary }]}>{biometricLabel}</Text>
           </HapticPressable>
         ) : null}
         <HapticPressable onPress={() => void enterDemoMode()} style={styles.biometricButton} testID="enter-demo">
-          <Feather name="play-circle" size={17} color={colors.foreground} />
-          <Text style={[styles.biometricText, { color: colors.foreground }]}>Explore the demo</Text>
+          <Feather name="play-circle" size={17} color={colors.primary} />
+          <Text style={[styles.biometricText, { color: colors.primary }]}>Explore the demo</Text>
         </HapticPressable>
         <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>
           The demo uses prepared dummy profiles and test money on this device only. No real details are collected.
@@ -411,10 +426,10 @@ function AuthScreen() {
         <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>
           {biometricAvailable ? 'Enter your 6-digit PIN to unlock' : 'Use your 6-digit PIN to unlock (enroll biometrics in device settings to enable this option)'}
         </Text>
+        <Text style={[styles.secureFooter, { color: colors.mutedForeground }]}>
+          <Feather name="shield" size={12} /> Your wallet is secured on this device
+        </Text>
       </View>
-      <Text style={[styles.secureFooter, { color: colors.mutedForeground }]}>
-        <Feather name="shield" size={12} /> Your wallet is secured on this device
-      </Text>
     </View>
   );
 
@@ -437,7 +452,6 @@ function AppSplashScreen({
   onContinue: () => void;
   onInstall?: () => void;
 }) {
-  const colors = useColors();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
   const [webHeight, setWebHeight] = useState(() =>
@@ -483,82 +497,91 @@ function AppSplashScreen({
   }, []);
 
   const splashContent = (
-    <ScrollView
-      style={styles.splashScroll}
-      contentContainerStyle={[
-        styles.splashRoot,
-        compactLayout && styles.splashRootCompact,
-        {
-          backgroundColor: colors.background,
-          paddingTop: Math.max(insets.top + (compactLayout ? 12 : 20), compactLayout ? 16 : 28),
-          paddingBottom: Math.max(insets.bottom + (compactLayout ? 12 : 20), compactLayout ? 16 : 28),
-        },
-      ]}
-      contentInsetAdjustmentBehavior="never"
-      showsVerticalScrollIndicator={false}
-      bounces={false}
+    <LinearGradient
+      colors={['#0B6E83', '#0E87A0', '#11A39B']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.splashGradient}
     >
-      <Animated.View
-        style={[
-          styles.splashHero,
-          compactLayout && styles.splashHeroCompact,
+      <ScrollView
+        style={styles.splashScroll}
+        contentContainerStyle={[
+          styles.splashRoot,
+          compactLayout && styles.splashRootCompact,
           {
-            opacity: heroOpacity,
-            transform: [{ translateY: heroTranslateY }],
+            paddingTop: Math.max(insets.top + (compactLayout ? 10 : 18), compactLayout ? 14 : 26),
+            paddingBottom: Math.max(insets.bottom + (compactLayout ? 10 : 18), compactLayout ? 14 : 26),
           },
         ]}
+        contentInsetAdjustmentBehavior="never"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
       >
-        <View style={[styles.splashArtwork, compactLayout && styles.splashArtworkCompact]}>
-          <View style={[styles.splashOrb, compactLayout && styles.splashOrbCompact, { backgroundColor: colors.accent }]} />
-          <View style={[styles.splashOrbInner, compactLayout && styles.splashOrbInnerCompact, { backgroundColor: colors.card }]}>
-            <LogoIcon size={compactLayout ? 58 : 76} />
+        <Animated.View
+          style={[
+            styles.splashHero,
+            compactLayout && styles.splashHeroCompact,
+            {
+              opacity: heroOpacity,
+              transform: [{ translateY: heroTranslateY }],
+            },
+          ]}
+        >
+          <View style={[styles.splashCircle, compactLayout && styles.splashCircleCompact]}>
+            <LogoIcon size={compactLayout ? 50 : 64} />
           </View>
-        </View>
-        <Text style={[styles.splashEyebrow, { color: colors.accentForeground }]}>SIMPLY SECURE PAYMENTS</Text>
-        <Text style={[styles.splashDescription, { color: colors.mutedForeground }]}>
-          Pay, get paid and manage your business wallet. Pilot build: test money only, no real payments.
-        </Text>
-      </Animated.View>
+          <Text style={styles.splashWordmark}>paymerch</Text>
+          <Text style={styles.splashTagline}>Simply Secure Payments</Text>
+        </Animated.View>
 
-      <View style={[styles.splashFooter, compactLayout && styles.splashFooterCompact]}>
-        <View style={styles.splashFeatures}>
-          <View style={[styles.splashFeature, compactLayout && styles.splashFeatureCompact, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="zap" size={16} color={colors.button} />
-            <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>Fast payments</Text>
+        <Animated.View style={[styles.splashMiddle, compactLayout && styles.splashMiddleCompact, { opacity: actionOpacity }]}>
+          <View style={styles.splashActionsRow}>
+            <View style={styles.splashActionItem}>
+              <View style={styles.splashActionCircle}>
+                <Feather name="zap" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={styles.splashActionLabel}>Pay fast</Text>
+            </View>
+            <View style={styles.splashActionItem}>
+              <View style={styles.splashActionCircle}>
+                <Feather name="maximize" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={styles.splashActionLabel}>One-time QR</Text>
+            </View>
+            <View style={styles.splashActionItem}>
+              <View style={styles.splashActionCircle}>
+                <Feather name="lock" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={styles.splashActionLabel}>PIN secured</Text>
+            </View>
           </View>
-          <View style={[styles.splashFeature, compactLayout && styles.splashFeatureCompact, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="clock" size={16} color={colors.button} />
-            <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>One-time QR</Text>
+
+          <View style={styles.splashCard}>
+            <View style={styles.splashCardTop}>
+              <LogoIcon size={28} />
+              <Text style={styles.splashCardLabel}>PAYMERCH WALLET</Text>
+            </View>
+            <Text style={styles.splashCardAmount}>R ••••</Text>
+            <Text style={styles.splashCardFoot}>Test-money pilot · no real payments</Text>
           </View>
-          <View style={[styles.splashFeature, compactLayout && styles.splashFeatureCompact, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="lock" size={16} color={colors.button} />
-            <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>PIN protected</Text>
-          </View>
-        </View>
-        <Animated.View style={{ opacity: actionOpacity }}>
-          <HapticPressable
-            onPress={onContinue}
-            style={[styles.splashAction, compactLayout && styles.splashActionCompact, { backgroundColor: colors.button }]}
-            testID="splash-get-started"
-          >
-            <Text style={[styles.splashActionText, { color: colors.buttonForeground }]}>Get started</Text>
-            <Feather name="arrow-right" size={18} color={colors.buttonForeground} />
+
+          <HapticPressable onPress={onContinue} style={styles.splashPill} testID="splash-get-started">
+            <Text style={styles.splashPillText}>Get started</Text>
+            <Feather name="arrow-right" size={18} color="#0E87A0" />
           </HapticPressable>
           {onInstall ? (
             <HapticPressable onPress={onInstall} style={styles.splashInstallAction} testID="splash-install">
-              <Feather name="download" size={16} color={colors.foreground} />
-              <Text style={[styles.splashInstallText, { color: colors.foreground }]}>Install Paymerch</Text>
+              <Feather name="download" size={16} color="#FFFFFF" />
+              <Text style={styles.splashInstallText}>Install Paymerch</Text>
             </HapticPressable>
           ) : null}
+          <View style={styles.splashSecurityNote}>
+            <Feather name="shield" size={13} color="rgba(255,255,255,0.8)" />
+            <Text style={styles.splashSecurityText}>Pilot build: secured with your 6-digit PIN</Text>
+          </View>
         </Animated.View>
-        <View style={styles.splashSecurityNote}>
-          <Feather name="shield" size={13} color={colors.mutedForeground} />
-          <Text style={[styles.splashSecurityText, { color: colors.mutedForeground }]}>
-            Pilot build: secured with your 6-digit PIN
-          </Text>
-        </View>
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </LinearGradient>
   );
 
   if (Platform.OS === 'web') {
@@ -806,50 +829,56 @@ function Header({
   online: boolean;
   onSettings: () => void;
 }) {
-  const colors = useColors();
   const { demoMode } = useWallet();
   return (
     <View style={styles.header}>
       <View style={styles.headerIdentity}>
-         <LogoIcon size={44} />
+        <View style={styles.headerLogoCircle}>
+          <LogoIcon size={28} />
+        </View>
         <View>
-          <Text style={[styles.headerTitle, { color: colors.foreground }]}>{title}</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.mutedForeground }]}>{subtitle}</Text>
+          <Text style={styles.headerTitleOnTeal}>{title}</Text>
+          <Text style={styles.headerSubtitleOnTeal}>{subtitle}</Text>
         </View>
       </View>
       <View style={styles.headerActions}>
         {demoMode ? (
-          <View style={[styles.statusPill, { backgroundColor: colors.warm }]} testID="demo-badge">
-            <Text style={[styles.statusText, { color: colors.warning }]}>DEMO</Text>
+          <View style={[styles.statusPill, { backgroundColor: 'rgba(255,255,255,0.18)' }]} testID="demo-badge">
+            <Text style={[styles.statusText, { color: '#FFE1B3' }]}>DEMO</Text>
           </View>
         ) : null}
-        <StatusPill online={online} colors={colors} />
-        <HapticPressable onPress={onSettings} style={[styles.iconButton, { borderColor: colors.border }]}>
-          <Feather name="sliders" size={18} color={colors.foreground} />
+        <View style={[styles.statusPill, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
+          <View style={[styles.statusDot, { backgroundColor: online ? '#5EEAD4' : '#FCD34D' }]} />
+          <Text style={[styles.statusText, { color: '#FFFFFF' }]}>
+            {online ? 'Online' : 'Offline'}
+          </Text>
+        </View>
+        <HapticPressable onPress={onSettings} style={styles.headerSettingsButton}>
+          <Feather name="sliders" size={18} color="#FFFFFF" />
         </HapticPressable>
       </View>
     </View>
   );
 }
 
-function BalanceCard({ balance, online, onToggle, label }: { balance: number; online: boolean; onToggle: () => void; label: string }) {
+function BalanceCard({ balance, online, label }: { balance: number; online: boolean; label: string }) {
   const colors = useColors();
   const { demoMode } = useWallet();
   const [hidden, setHidden] = useState(false);
   return (
-    <View style={[styles.balanceCard, { backgroundColor: colors.dark }]}>
+    <View style={styles.balanceCardWhite}>
       <View style={styles.balanceTop}>
-        <Text style={styles.balanceLabel}>{label}</Text>
-        <HapticPressable onPress={onToggle} style={styles.balanceVisibility}>
-          <Feather name={hidden ? 'eye-off' : 'eye'} size={17} color="#B8B8B8" />
+        <Text style={[styles.balanceLabel, { color: colors.mutedForeground }]}>{label}</Text>
+        <HapticPressable onPress={() => setHidden((value) => !value)} style={styles.balanceVisibility}>
+          <Feather name={hidden ? 'eye-off' : 'eye'} size={17} color={colors.mutedForeground} />
         </HapticPressable>
       </View>
-      <Text style={styles.balanceAmount}>{hidden ? '••••••' : zar(balance)}</Text>
+      <Text style={[styles.balanceAmountDark, { color: colors.foreground }]}>{hidden ? '••••••' : zar(balance)}</Text>
       <View style={styles.balanceBottom}>
-        <Text style={styles.balanceFoot}>{online ? 'Available balance · ZAR' : 'Cached balance - may be out of date'}</Text>
-        <View style={styles.secureBadge}>
-          <Feather name="shield" size={12} color="#A7F3D0" />
-          <Text style={styles.secureBadgeText}>{demoMode ? 'Local demo' : online ? 'Test money' : 'Cached copy'}</Text>
+        <Text style={[styles.balanceFoot, { color: colors.mutedForeground }]}>{online ? 'Available balance · ZAR' : 'Cached balance - may be out of date'}</Text>
+        <View style={[styles.secureBadgeLight, { backgroundColor: colors.accent }]}>
+          <Feather name="shield" size={12} color={colors.accentForeground} />
+          <Text style={[styles.secureBadgeTextLight, { color: colors.accentForeground }]}>{demoMode ? 'Local demo' : online ? 'Test money' : 'Cached copy'}</Text>
         </View>
       </View>
     </View>
@@ -892,12 +921,11 @@ function ActivityRow({ transaction, colors }: { transaction: Transaction; colors
 function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
   const colors = useColors();
   return (
-    <HapticPressable onPress={onPress} style={[styles.quickAction, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.quickIcon, { backgroundColor: colors.muted }]}>
-        <Feather name={icon} size={18} color={colors.foreground} />
+    <HapticPressable onPress={onPress} style={styles.quickAction}>
+      <View style={[styles.quickIcon, { backgroundColor: colors.accent }]}>
+        <Feather name={icon} size={20} color={colors.accentForeground} />
       </View>
       <Text style={[styles.quickLabel, { color: colors.foreground }]}>{label}</Text>
-      <Feather name="arrow-up-right" size={15} color={colors.mutedForeground} />
     </HapticPressable>
   );
 }
@@ -915,20 +943,27 @@ function HomeScreen({
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: 124 }]}
+      contentContainerStyle={{ paddingBottom: 124 }}
     >
-      <Header
-        title={profile.name}
-        subtitle={profile.accountType === 'business' ? profile.businessCategory ?? 'Informal business' : 'Individual wallet'}
-        online={online}
-        onSettings={() => onNavigate('settings')}
-      />
-      <BalanceCard
-        balance={profile.accountType === 'business' ? merchantBalance : buyerBalance}
-        online={online}
-        onToggle={toggleOnline}
-        label={profile.accountType === 'business' ? 'BUSINESS WALLET' : 'PERSONAL WALLET'}
-      />
+      <LinearGradient
+        colors={['#0B6E83', '#0E87A0']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={[styles.homeBand, { paddingTop: insets.top + 18 }]}
+      >
+        <Header
+          title={profile.name}
+          subtitle={profile.accountType === 'business' ? profile.businessCategory ?? 'Informal business' : 'Individual wallet'}
+          online={online}
+          onSettings={() => onNavigate('settings')}
+        />
+        <BalanceCard
+          balance={profile.accountType === 'business' ? merchantBalance : buyerBalance}
+          online={online}
+          label={profile.accountType === 'business' ? 'BUSINESS WALLET' : 'PERSONAL WALLET'}
+        />
+      </LinearGradient>
+      <View style={styles.homeBody}>
       {profile.accountType === 'business' ? (
         <HapticPressable onPress={() => onNavigate('scan')} style={[styles.scanCta, { backgroundColor: colors.button }]}>
           <View style={styles.scanCtaCopy}>
@@ -987,6 +1022,7 @@ function HomeScreen({
           </View>
         </View>
       ) : null}
+      </View>
     </ScrollView>
   );
 }
@@ -1173,7 +1209,8 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 
   const [permissionResponse, requestPermission] = useCameraPermissions();
   const [asked, setAsked] = useState(false);
-  const [result, setResult] = useState<'idle' | 'success'>('idle');
+  const [result, setResult] = useState<'idle' | 'success' | 'failed'>('idle');
+  const [failureMessage, setFailureMessage] = useState('');
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [pinError, setPinError] = useState('');
   const [scannedPayload, setScannedPayload] = useState<QrPayload | null>(null);
@@ -1270,25 +1307,41 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       setPinModalVisible(false);
       setPinError('');
       setScannedPayload(null);
-      setPreview(null);
       setScanned(false);
-      setScanError(messages[outcome]);
+      setFailureMessage(messages[outcome]);
+      setResult('failed');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
-  if (result !== 'idle') {
+  if (result === 'success') {
     return (
       <View style={[styles.successRoot, { backgroundColor: colors.background, paddingTop: insets.top + 18 }]}>
-        <View style={[styles.successMark, { backgroundColor: colors.accent }]}>
-          <Feather name="check" size={34} color={colors.success} />
+        <View style={[styles.successMark, { backgroundColor: colors.button }]}>
+          <Feather name="check" size={38} color="#FFFFFF" />
         </View>
         <Text style={[styles.successTitle, { color: colors.foreground }]}>Test payment received</Text>
+        {preview ? (
+          <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultRowLabel, { color: colors.mutedForeground }]}>Amount</Text>
+              <Text style={[styles.resultRowValue, { color: colors.foreground }]}>{zar(preview.amount)}</Text>
+            </View>
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultRowLabel, { color: colors.mutedForeground }]}>From</Text>
+              <Text style={[styles.resultRowValue, { color: colors.foreground }]}>{preview.payerName}</Text>
+            </View>
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultRowLabel, { color: colors.mutedForeground }]}>Status</Text>
+              <Text style={[styles.resultRowValue, { color: colors.success }]}>Completed · test money</Text>
+            </View>
+          </View>
+        ) : null}
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
           Test money moved from the customer's wallet to your business wallet on the pilot server. No real money moved.
         </Text>
-        <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, { backgroundColor: colors.button }]}>
-          <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Back to dashboard</Text>
+        <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, styles.resultButton, { backgroundColor: colors.button }]}>
+          <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Done</Text>
         </HapticPressable>
         <HapticPressable
           onPress={() => {
@@ -1298,6 +1351,30 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           style={styles.textButton}
         >
           <Text style={[styles.textButtonLabel, { color: colors.foreground }]}>Scan another payment</Text>
+        </HapticPressable>
+      </View>
+    );
+  }
+
+  if (result === 'failed') {
+    return (
+      <View style={[styles.successRoot, { backgroundColor: colors.background, paddingTop: insets.top + 18 }]}>
+        <View style={[styles.successMark, { backgroundColor: colors.warm }]}>
+          <Feather name="alert-triangle" size={34} color={colors.warning} />
+        </View>
+        <Text style={[styles.successTitle, { color: colors.foreground }]}>Payment failed</Text>
+        <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>{failureMessage}</Text>
+        <HapticPressable
+          onPress={() => {
+            setResult('idle');
+            resetScan();
+          }}
+          style={[styles.primaryButton, styles.resultButton, { backgroundColor: colors.button }]}
+        >
+          <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Try again</Text>
+        </HapticPressable>
+        <HapticPressable onPress={() => onNavigate('home')} style={styles.textButton}>
+          <Text style={[styles.textButtonLabel, { color: colors.foreground }]}>Back to dashboard</Text>
         </HapticPressable>
       </View>
     );
@@ -1697,7 +1774,7 @@ function BottomNav({ screen, onNavigate }: { screen: Screen; onNavigate: (screen
         const active = screen === item.key;
         return (
           <HapticPressable key={item.key} onPress={() => onNavigate(item.key)} style={styles.navItem}>
-            <View style={[styles.navIcon, active && { backgroundColor: colors.foreground }]}>
+            <View style={[styles.navIcon, active && { backgroundColor: colors.button }]}>
               <Feather name={item.icon} size={18} color={active ? colors.primaryForeground : colors.mutedForeground} />
             </View>
             <Text style={[styles.navLabel, { color: active ? colors.foreground : colors.mutedForeground }]}>{item.label}</Text>
@@ -1869,8 +1946,8 @@ const styles = StyleSheet.create({
   splashInstallText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
   splashSecurityNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 1 },
   splashSecurityText: { fontFamily: 'Montserrat_400Regular', fontSize: 11, textAlign: 'center' },
-  authRoot: { flex: 1, paddingHorizontal: 24, justifyContent: 'space-between', maxWidth: 480, alignSelf: 'center', width: '100%' },
-  authTop: { alignItems: 'center', paddingTop: 76, gap: 5, width: '100%' },
+  authRoot: { flex: 1, justifyContent: 'space-between', maxWidth: 480, alignSelf: 'center', width: '100%' },
+  authTop: { alignItems: 'center', paddingTop: 66, gap: 5, width: '100%' },
   brandName: { fontFamily: 'Montserrat_700Bold', fontSize: 16, letterSpacing: 3.4, textAlign: 'center' },
   tagline: { fontFamily: 'Montserrat_400Regular', fontSize: 13, textAlign: 'center' },
   authBody: { alignItems: 'center', width: '100%', marginTop: 20 },
@@ -1954,14 +2031,14 @@ const styles = StyleSheet.create({
   registrationNoteCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderWidth: 1, borderRadius: 14, padding: 13, marginTop: 14 },
   registrationNote: { flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 11, lineHeight: 16 },
   pinPad: { width: '100%', maxWidth: 330, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
-  pinKey: { width: 92, height: 53, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
+  pinKey: { width: 74, height: 74, borderRadius: 37, alignItems: 'center', justifyContent: 'center' },
   pinKeyCircle: { borderRadius: 30 },
   pinKeyText: { fontFamily: 'Montserrat_500Medium', fontSize: 22 },
   scanErrorPill: { marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.06)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 12 },
   biometricButton: { flexDirection: 'row', gap: 8, alignItems: 'center', padding: 10, marginTop: 10 },
   biometricText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
   demoHint: { fontFamily: 'Montserrat_400Regular', fontSize: 12, marginTop: 2 },
-  secureFooter: { textAlign: 'center', fontFamily: 'Montserrat_400Regular', fontSize: 12, paddingBottom: 24 },
+  secureFooter: { textAlign: 'center', fontFamily: 'Montserrat_400Regular', fontSize: 12, paddingBottom: 24, marginTop: 14 },
   scrollContent: { paddingHorizontal: 18 },
   screenRoot: { flex: 1, paddingHorizontal: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -1982,12 +2059,12 @@ const styles = StyleSheet.create({
   balanceFoot: { fontFamily: 'Montserrat_400Regular', color: '#A7A7A7', fontSize: 12 },
   secureBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   secureBadgeText: { fontFamily: 'Montserrat_500Medium', color: '#A7F3D0', fontSize: 11 },
-  pinSummary: { marginTop: 14, borderRadius: 13, paddingVertical: 11, paddingHorizontal: 16, alignItems: 'center' },
+  pinSummary: { marginTop: 14, borderRadius: 13, paddingVertical: 11, paddingHorizontal: 16, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 },
   pinSummaryText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, textAlign: 'center' },
   pinModal: { borderRadius: 24, padding: 24, width: '90%', maxWidth: 360, alignSelf: 'center' },
   pinModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   pinModalTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 20, marginTop: 4 },
-  scanCta: { borderRadius: 22, minHeight: 112, padding: 18, marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  scanCta: { borderRadius: 22, minHeight: 112, padding: 18, marginTop: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   scanCtaCopy: { flex: 1, minWidth: 0 },
   scanCtaEyebrow: { fontFamily: 'Montserrat_700Bold', fontSize: 10, letterSpacing: 1.1 },
   scanCtaTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 22, marginTop: 6 },
@@ -1997,10 +2074,10 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 16 },
   sectionHint: { fontFamily: 'Montserrat_400Regular', fontSize: 12 },
   sectionLink: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12 },
-  actionGrid: { flexDirection: 'row', gap: 8 },
-  quickAction: { flex: 1, minHeight: 82, borderRadius: 18, borderWidth: 1, padding: 12, justifyContent: 'space-between' },
-  quickIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  quickLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
+  actionGrid: { flexDirection: 'row', gap: 8, justifyContent: 'space-around', marginTop: 4 },
+  quickAction: { alignItems: 'center', gap: 8, minWidth: 78, paddingVertical: 4 },
+  quickIcon: { width: 54, height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center' },
+  quickLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12, textAlign: 'center' },
   activityCard: { borderWidth: 1, borderRadius: 20, paddingHorizontal: 14 },
   activityRow: { flexDirection: 'row', alignItems: 'center', minHeight: 73, borderBottomWidth: 1, borderBottomColor: '#F0F0ED' },
   activityIcon: { width: 37, height: 37, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
@@ -2068,7 +2145,7 @@ const styles = StyleSheet.create({
   scanDemoText: { fontFamily: 'Montserrat_700Bold', fontSize: 14 },
   scannerFootnote: { fontFamily: 'Montserrat_400Regular', color: '#777777', textAlign: 'center', fontSize: 11, marginTop: 12 },
   successRoot: { flex: 1, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' },
-  successMark: { width: 78, height: 78, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  successMark: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
   successTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 26, marginTop: 20 },
   successSubtitle: { fontFamily: 'Montserrat_400Regular', textAlign: 'center', lineHeight: 20, fontSize: 14, marginTop: 10, maxWidth: 300 },
   textButton: { padding: 15, marginTop: 6 },
@@ -2094,7 +2171,7 @@ const styles = StyleSheet.create({
   tokenCaption: { fontFamily: 'Montserrat_700Bold', fontSize: 9, letterSpacing: 1, marginTop: 8 },
   bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, minHeight: 76, borderTopWidth: 1, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', paddingTop: 8 },
   navItem: { alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 58 },
-  navIcon: { width: 31, height: 26, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  navIcon: { width: 44, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   navLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 10 },
   cashOutModal: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, minHeight: 280 },
   settingsProfile: { borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28 },
@@ -2123,4 +2200,45 @@ const styles = StyleSheet.create({
   settingsNoteText: { flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 11, lineHeight: 16 },
   logoutButton: { minHeight: 51, borderRadius: 16, borderWidth: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 22 },
   logoutText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
+  splashGradient: { flex: 1, width: '100%', alignItems: 'center' },
+  splashCircle: { width: 112, height: 112, borderRadius: 56, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
+  splashCircleCompact: { width: 92, height: 92, borderRadius: 46 },
+  splashWordmark: { fontFamily: 'Montserrat_700Bold', fontSize: 34, color: '#FFFFFF', marginTop: 14, textAlign: 'center', letterSpacing: 0.5 },
+  splashTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.82)', marginTop: 5, textAlign: 'center' },
+  splashMiddle: { gap: 18, width: '100%' },
+  splashMiddleCompact: { gap: 12 },
+  splashActionsRow: { flexDirection: 'row', justifyContent: 'space-evenly', width: '100%' },
+  splashActionItem: { alignItems: 'center', minWidth: 84 },
+  splashActionCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
+  splashActionLabel: { fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#FFFFFF', marginTop: 8, textAlign: 'center' },
+  splashCard: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 18, width: '100%' },
+  splashCardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  splashCardLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, letterSpacing: 1.4, color: '#5E737B' },
+  splashCardAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 30, letterSpacing: -0.8, color: '#0B1F2A', marginTop: 12 },
+  splashCardFoot: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#5E737B', marginTop: 8 },
+  splashPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 28, minHeight: 56, paddingHorizontal: 20, backgroundColor: '#FFFFFF', alignSelf: 'stretch' },
+  splashPillText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#0E87A0' },
+  authLogoCircle: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  authWordmark: { fontFamily: 'Montserrat_700Bold', fontSize: 26, color: '#FFFFFF', marginTop: 12, textAlign: 'center', letterSpacing: 0.5 },
+  authTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.82)', textAlign: 'center' },
+  authSheet: { borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 24, paddingTop: 28, marginTop: 26, alignItems: 'center', width: '100%' },
+  headerLogoCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  headerTitleOnTeal: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#FFFFFF' },
+  headerSubtitleOnTeal: { fontFamily: 'Montserrat_400Regular', fontSize: 12, marginTop: 3, color: 'rgba(255,255,255,0.78)' },
+  headerSettingsButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 12, borderColor: 'rgba(255,255,255,0.35)' },
+  homeBand: { paddingHorizontal: 18, paddingBottom: 24, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
+  homeBody: { paddingHorizontal: 18 },
+  balanceCardWhite: { borderRadius: 24, padding: 19, marginTop: 18, minHeight: 148, backgroundColor: '#FFFFFF', shadowColor: '#0B3B4A', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
+  balanceAmountDark: { fontFamily: 'Montserrat_700Bold', fontSize: 34, letterSpacing: -1.2, marginTop: 19 },
+  secureBadgeLight: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 5 },
+  secureBadgeTextLight: { fontFamily: 'Montserrat_500Medium', fontSize: 11 },
+  sheetHandle: { width: 42, height: 4, borderRadius: 2, backgroundColor: '#D8D8D3', alignSelf: 'center', marginBottom: 16 },
+  pinSheet: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, paddingTop: 14, width: '100%', maxWidth: 480, alignSelf: 'center', alignItems: 'center' },
+  processingBlock: { alignItems: 'center', gap: 12, paddingVertical: 34 },
+  processingText: { fontFamily: 'Montserrat_500Medium', fontSize: 13 },
+  resultButton: { alignSelf: 'stretch', marginTop: 20 },
+  resultCard: { width: '100%', borderRadius: 18, borderWidth: 1, padding: 16, marginTop: 20, gap: 10 },
+  resultRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  resultRowLabel: { fontFamily: 'Montserrat_400Regular', fontSize: 12 },
+  resultRowValue: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
 });
