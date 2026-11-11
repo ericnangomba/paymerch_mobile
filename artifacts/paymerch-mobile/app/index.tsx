@@ -21,11 +21,10 @@ import { useColors } from '@/hooks/useColors';
 import {
   AccountType,
   BusinessCategory,
-  BankAccountType,
   Transaction,
-  TransactionAuth,
   UserProfile,
   PaymentRequest,
+  PaymentRequestPreview,
   useWallet,
 } from '@/state/paymerch-context';
 
@@ -56,43 +55,7 @@ const businessCategoryIcons: Record<BusinessCategory, IconName> = {
   'Mini bus taxi': 'truck',
 };
 
-const southAfricanBanks = [
-  'Absa Bank',
-  'Access Bank South Africa',
-  'African Bank',
-  'Albaraka Bank',
-  'Bank of Baroda',
-  'Bank of China (South Africa)',
-  'Bank Zero',
-  'Bidvest Bank',
-  'BNP Paribas South Africa',
-  'Capitec Bank',
-  'China Construction Bank (South Africa)',
-  'Citibank South Africa',
-  'Deutsche Bank South Africa',
-  'Discovery Bank',
-  'Finbond Mutual Bank',
-  'First National Bank (FNB)',
-  'Grindrod Bank',
-  'Habib Overseas Bank (HBZ)',
-  'HSBC South Africa',
-  'ICBC South Africa',
-  'Investec Bank',
-  'Ithala SOC Limited',
-  'JPMorgan Chase Bank South Africa',
-  'Mercantile Bank',
-  'Nedbank',
-  'Postbank',
-  'Sasfin Bank',
-  'Société Générale South Africa',
-  'Standard Bank',
-  'Standard Chartered Bank South Africa',
-  'State Bank of India South Africa',
-  'TymeBank',
-  'Ubank',
-].sort((a, b) => a.localeCompare(b));
 
-const bankAccountTypes: BankAccountType[] = ['Cheque / Current', 'Savings', 'Transmission'];
 
 const logo = require('../assets/images/paymerchlogo.png');
 const logoMark = require('../assets/images/mlogo.png');
@@ -220,32 +183,30 @@ function PinConfirmationModal({
   visible,
   onConfirm,
   onCancel,
-  canUseBiometric,
-  biometricLabel,
   title,
+  summary,
   error: externalError,
   onClearError,
 }: {
   visible: boolean;
-  onConfirm: (auth: TransactionAuth) => void;
+  onConfirm: (pin: string) => void;
   onCancel: () => void;
-  canUseBiometric: boolean;
-  biometricLabel: string;
   title: string;
+  summary?: string;
   error?: string;
   onClearError?: () => void;
 }) {
   const colors = useColors();
-  const { verifyBiometrics } = useWallet();
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const { demoMode, demoPin } = useWallet();
 
   // Use external error if provided
   const displayError = externalError || error;
 
   const complete = (next: string) => {
-    onConfirm({ pin: next });
+    onConfirm(next);
   };
 
   const handleDigit = (digit: string) => {
@@ -266,18 +227,6 @@ function PinConfirmationModal({
     setError('');
   };
 
-  const handleBiometric = async () => {
-    if (isProcessing) return;
-    setIsProcessing(true);
-    const success = await verifyBiometrics();
-    if (success) {
-      onConfirm({ biometric: true });
-    } else {
-      setError('Biometric authentication failed. Please use your PIN.');
-    }
-    setIsProcessing(false);
-  };
-
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
   // Reset state when modal opens/closes
@@ -288,20 +237,6 @@ function PinConfirmationModal({
       setIsProcessing(false);
     }
   }, [visible]);
-
-  const renderBiometricButton = canUseBiometric && (
-    <HapticPressable
-      onPress={() => {
-        void handleBiometric();
-      }}
-      style={[styles.pinKey, styles.pinKeyCircle, { backgroundColor: colors.card }]}
-    >
-      <Feather name="smartphone" size={21} color={colors.foreground} />
-      <Text style={[styles.pinKeyText, { color: colors.foreground, marginLeft: 8 }]}>
-        {biometricLabel}
-      </Text>
-    </HapticPressable>
-  );
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
@@ -314,9 +249,19 @@ function PinConfirmationModal({
               <Feather name="x" size={20} color={colors.foreground} />
             </HapticPressable>
           </View>
+          {summary ? (
+            <View style={[styles.pinSummary, { backgroundColor: colors.accent }]}>
+              <Text style={[styles.pinSummaryText, { color: colors.accentForeground }]}>{summary}</Text>
+            </View>
+          ) : null}
           <Text style={[styles.authSubtitle, { color: colors.mutedForeground }, { textAlign: 'center', marginTop: 10 }]}>
-            Enter your PIN or use biometrics to confirm this transaction
+            Enter your 6-digit PIN to confirm this transaction
           </Text>
+          {demoMode ? (
+            <Text style={[styles.authSubtitle, { color: colors.mutedForeground }, { textAlign: 'center', marginTop: 2 }]}>
+              Demo mode: use PIN {demoPin}
+            </Text>
+          ) : null}
           <View style={styles.pinDots}>
             {[0, 1, 2, 3, 4, 5].map((index) => (
               <View
@@ -340,7 +285,6 @@ function PinConfirmationModal({
               <Feather name="delete" size={21} color={colors.foreground} />
             </HapticPressable>
           </View>
-          {renderBiometricButton}
         </View>
       </View>
     </Modal>
@@ -349,17 +293,17 @@ function PinConfirmationModal({
 
 function AuthScreen() {
   const colors = useColors();
-  const { login, biometricLogin, isRegistered, biometricAvailable, biometricLabel, verifyBiometrics } = useWallet();
+  const { login, biometricLogin, isRegistered, biometricAvailable, biometricLabel, verifyBiometrics, enterDemoMode } = useWallet();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [registrationMessage, setRegistrationMessage] = useState('');
 
-  // If not registered, show registration screen by default
+  // Registered wallets land on the PIN pad; unregistered ones on registration.
+  // Entering demo mode marks a prepared profile as registered, which brings
+  // up its demo-PIN login without touching the registration form.
   useEffect(() => {
-    if (!isRegistered) {
-      setMode('register');
-    }
+    setMode(isRegistered ? 'login' : 'register');
   }, [isRegistered]);
 
   const handleBiometricUnlock = async () => {
@@ -457,6 +401,13 @@ function AuthScreen() {
             <Text style={[styles.biometricText, { color: colors.foreground }]}>{biometricLabel}</Text>
           </HapticPressable>
         ) : null}
+        <HapticPressable onPress={() => void enterDemoMode()} style={styles.biometricButton} testID="enter-demo">
+          <Feather name="play-circle" size={17} color={colors.foreground} />
+          <Text style={[styles.biometricText, { color: colors.foreground }]}>Explore the demo</Text>
+        </HapticPressable>
+        <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>
+          The demo uses prepared dummy profiles and test money on this device only. No real details are collected.
+        </Text>
         <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>
           {biometricAvailable ? 'Enter your 6-digit PIN to unlock' : 'Use your 6-digit PIN to unlock (enroll biometrics in device settings to enable this option)'}
         </Text>
@@ -565,7 +516,7 @@ function AppSplashScreen({
         </View>
         <Text style={[styles.splashEyebrow, { color: colors.accentForeground }]}>SIMPLY SECURE PAYMENTS</Text>
         <Text style={[styles.splashDescription, { color: colors.mutedForeground }]}>
-          Pay, get paid and manage your business wallet, even when you are offline.
+          Pay, get paid and manage your business wallet. Pilot build: test money only, no real payments.
         </Text>
       </Animated.View>
 
@@ -576,8 +527,8 @@ function AppSplashScreen({
             <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>Fast payments</Text>
           </View>
           <View style={[styles.splashFeature, compactLayout && styles.splashFeatureCompact, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Feather name="wifi-off" size={16} color={colors.button} />
-            <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>Works offline</Text>
+            <Feather name="clock" size={16} color={colors.button} />
+            <Text style={[styles.splashFeatureText, { color: colors.foreground }]}>One-time QR</Text>
           </View>
           <View style={[styles.splashFeature, compactLayout && styles.splashFeatureCompact, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <Feather name="lock" size={16} color={colors.button} />
@@ -603,7 +554,7 @@ function AppSplashScreen({
         <View style={styles.splashSecurityNote}>
           <Feather name="shield" size={13} color={colors.mutedForeground} />
           <Text style={[styles.splashSecurityText, { color: colors.mutedForeground }]}>
-            Your money and details stay protected
+            Pilot build: secured with your 6-digit PIN
           </Text>
         </View>
       </View>
@@ -620,18 +571,11 @@ function AppSplashScreen({
 function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRegistered: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { registerAccount } = useWallet();
+  const { registerAccount, enterDemoMode } = useWallet();
   const [accountType, setAccountType] = useState<AccountType>('business');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState<BusinessCategory>('Spaza shop');
-  const [bankName, setBankName] = useState('');
-  const [bankSearch, setBankSearch] = useState('');
-  const [bankPickerVisible, setBankPickerVisible] = useState(false);
-  const [bankAccountType, setBankAccountType] = useState<BankAccountType>('Cheque / Current');
-  const [bankAccountHolder, setBankAccountHolder] = useState('');
-  const [bankAccountNumber, setBankAccountNumber] = useState('');
-  const [bankBranchCode, setBankBranchCode] = useState('');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -647,22 +591,6 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
       setError('Enter a valid mobile number.');
       return;
     }
-    if (!bankName) {
-      setError('Choose your bank.');
-      return;
-    }
-    if (bankAccountHolder.trim().length < 2) {
-      setError('Enter the name registered on your bank account.');
-      return;
-    }
-    if (!/^\d{6,20}$/.test(bankAccountNumber)) {
-      setError('Enter a valid bank account number (6–20 digits).');
-      return;
-    }
-    if (bankBranchCode && !/^\d{6}$/.test(bankBranchCode)) {
-      setError('A branch code must be 6 digits.');
-      return;
-    }
     if (!/^\d{6}$/.test(pin)) {
       setError('Your PIN must be exactly 6 digits.');
       return;
@@ -675,14 +603,13 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
       accountType,
       name: name.trim(),
       phone: phone.trim(),
-      bankName,
-      bankAccountHolder: bankAccountHolder.trim(),
-      bankAccountNumber,
-      bankAccountType,
-      ...(bankBranchCode ? { bankBranchCode } : {}),
       ...(accountType === 'business' ? { businessCategory: category } : {}),
     };
-    await registerAccount(profile, pin);
+    const ok = await registerAccount(profile, pin);
+    if (!ok) {
+      setError('Could not create your account. The number may already be registered, or the server is unreachable.');
+      return;
+    }
     onRegistered();
   };
 
@@ -805,97 +732,6 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
           />
         </View>
       </View>
-      <View style={[styles.bankSection, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={styles.bankSectionHeading}>
-          <View style={[styles.bankSectionIcon, { backgroundColor: colors.accent }]}>
-            <Feather name="credit-card" size={17} color={colors.accentForeground} />
-          </View>
-          <View style={styles.bankSectionCopy}>
-            <Text style={[styles.registrationSectionTitle, { color: colors.foreground }]}>Link your bank account</Text>
-            <Text style={[styles.registrationSectionHint, { color: colors.mutedForeground }]}>
-              For adding money to your wallet and future withdrawals.
-            </Text>
-          </View>
-        </View>
-        <Text style={[styles.registrationFieldLabel, { color: colors.foreground }]}>BANK</Text>
-        <HapticPressable
-          onPress={() => setBankPickerVisible(true)}
-          style={[styles.registrationInputShell, styles.bankSelector, { backgroundColor: colors.card, borderColor: colors.border }]}
-          testID="registration-bank-picker"
-        >
-          <Feather name="briefcase" size={18} color={colors.mutedForeground} />
-          <Text style={[styles.bankSelectorText, { color: bankName ? colors.foreground : colors.mutedForeground }]}>
-            {bankName || 'Select your bank'}
-          </Text>
-          <Feather name="chevron-down" size={18} color={colors.mutedForeground} />
-        </HapticPressable>
-        <Text style={[styles.registrationFieldLabel, styles.bankFieldLabel, { color: colors.foreground }]}>ACCOUNT TYPE</Text>
-        <View style={styles.bankAccountTypeRow}>
-          {bankAccountTypes.map((type) => {
-            const selected = bankAccountType === type;
-            return (
-              <HapticPressable
-                key={type}
-                onPress={() => setBankAccountType(type)}
-                style={[
-                  styles.bankAccountTypeOption,
-                  { backgroundColor: selected ? colors.accent : colors.card, borderColor: selected ? colors.button : colors.border },
-                ]}
-              >
-                <Text style={[styles.bankAccountTypeText, { color: selected ? colors.accentForeground : colors.foreground }]}>{type}</Text>
-              </HapticPressable>
-            );
-          })}
-        </View>
-        <View style={styles.bankFieldsRow}>
-          <View style={styles.bankAccountNameField}>
-            <Text style={[styles.registrationFieldLabel, styles.bankFieldLabel, { color: colors.foreground }]}>ACCOUNT HOLDER</Text>
-            <View style={[styles.registrationInputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TextInput
-                value={bankAccountHolder}
-                onChangeText={(value) => { setBankAccountHolder(value); setError(''); }}
-                placeholder="Name on account"
-                placeholderTextColor={colors.mutedForeground}
-                autoCapitalize="words"
-                style={[styles.registrationInput, { color: colors.foreground }]}
-                testID="registration-bank-account-holder"
-              />
-            </View>
-          </View>
-          <View style={styles.bankAccountNameField}>
-            <Text style={[styles.registrationFieldLabel, styles.bankFieldLabel, { color: colors.foreground }]}>ACCOUNT NUMBER</Text>
-            <View style={[styles.registrationInputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
-              <TextInput
-                value={bankAccountNumber}
-                onChangeText={(value) => { setBankAccountNumber(value.replace(/\D/g, '').slice(0, 20)); setError(''); }}
-                placeholder="Account number"
-                placeholderTextColor={colors.mutedForeground}
-                keyboardType="number-pad"
-                style={[styles.registrationInput, { color: colors.foreground }]}
-                testID="registration-bank-account-number"
-              />
-            </View>
-          </View>
-        </View>
-        <Text style={[styles.registrationFieldLabel, styles.bankFieldLabel, { color: colors.foreground }]}>BRANCH CODE <Text style={{ color: colors.mutedForeground, fontFamily: 'Montserrat_400Regular', letterSpacing: 0 }}>(optional)</Text></Text>
-        <View style={[styles.registrationInputShell, styles.bankBranchInput, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <TextInput
-            value={bankBranchCode}
-            onChangeText={(value) => { setBankBranchCode(value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
-            placeholder="6-digit branch code"
-            placeholderTextColor={colors.mutedForeground}
-            keyboardType="number-pad"
-            style={[styles.registrationInput, { color: colors.foreground }]}
-            testID="registration-bank-branch-code"
-          />
-        </View>
-        <View style={[styles.bankTransferNotice, { backgroundColor: colors.warm }]}>
-          <Feather name="info" size={15} color={colors.warning} />
-          <Text style={[styles.bankTransferNoticeText, { color: colors.foreground }]}>
-            Bank transfers are not connected in this prototype. Your details are saved on this device only.
-          </Text>
-        </View>
-      </View>
       <View style={styles.registrationPinSection}>
         <View style={styles.registrationPinHeading}>
           <View>
@@ -945,71 +781,16 @@ function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRe
       <View style={[styles.registrationNoteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Feather name="info" size={16} color={colors.mutedForeground} />
         <Text style={[styles.registrationNote, { color: colors.mutedForeground }]}>
-          Prototype notice: your account, bank details, and PIN are stored on this device. Bank transfers are not enabled yet.
+          Pilot notice: your account and PIN are secured on the pilot server. No bank details are collected, and no real money moves.
         </Text>
       </View>
-      <Modal
-        visible={bankPickerVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => { setBankPickerVisible(false); setBankSearch(''); }}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.bankPickerModal, { backgroundColor: colors.card }]}>
-            <View style={styles.bankPickerHeader}>
-              <View>
-                <Text style={[styles.registrationSectionTitle, { color: colors.foreground }]}>Select your bank</Text>
-                <Text style={[styles.registrationSectionHint, { color: colors.mutedForeground }]}>South African banks</Text>
-              </View>
-              <HapticPressable
-                onPress={() => { setBankPickerVisible(false); setBankSearch(''); }}
-                style={styles.closeButton}
-                accessibilityLabel="Close bank selector"
-              >
-                <Feather name="x" size={20} color={colors.foreground} />
-              </HapticPressable>
-            </View>
-            <View style={[styles.registrationInputShell, styles.bankSearchShell, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <Feather name="search" size={17} color={colors.mutedForeground} />
-              <TextInput
-                value={bankSearch}
-                onChangeText={setBankSearch}
-                placeholder="Search banks"
-                placeholderTextColor={colors.mutedForeground}
-                autoCorrect={false}
-                style={[styles.registrationInput, { color: colors.foreground }]}
-                testID="registration-bank-search"
-              />
-            </View>
-            <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false} style={styles.bankList}>
-              {southAfricanBanks
-                .filter((bank) => bank.toLowerCase().includes(bankSearch.trim().toLowerCase()))
-                .map((bank) => (
-                  <HapticPressable
-                    key={bank}
-                    onPress={() => {
-                      setBankName(bank);
-                      setBankPickerVisible(false);
-                      setBankSearch('');
-                      setError('');
-                    }}
-                    style={[styles.bankOption, { borderBottomColor: colors.border }]}
-                    testID={`registration-bank-option-${bank}`}
-                  >
-                    <View style={[styles.bankOptionIcon, { backgroundColor: colors.muted }]}>
-                      <Feather name="briefcase" size={16} color={colors.mutedForeground} />
-                    </View>
-                    <Text style={[styles.bankOptionText, { color: colors.foreground }]}>{bank}</Text>
-                    {bankName === bank ? <Feather name="check-circle" size={18} color={colors.button} /> : null}
-                  </HapticPressable>
-                ))}
-              {southAfricanBanks.filter((bank) => bank.toLowerCase().includes(bankSearch.trim().toLowerCase())).length === 0 ? (
-                <Text style={[styles.bankEmptyText, { color: colors.mutedForeground }]}>No banks match your search.</Text>
-              ) : null}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      <HapticPressable onPress={() => void enterDemoMode()} style={styles.biometricButton} testID="enter-demo">
+        <Feather name="play-circle" size={17} color={colors.foreground} />
+        <Text style={[styles.biometricText, { color: colors.foreground }]}>Explore the demo instead</Text>
+      </HapticPressable>
+      <Text style={[styles.demoHint, { color: colors.mutedForeground }]}>
+        The demo uses prepared dummy profiles and test money on this device only. No real details are collected.
+      </Text>
     </ScrollView>
   );
 }
@@ -1026,6 +807,7 @@ function Header({
   onSettings: () => void;
 }) {
   const colors = useColors();
+  const { demoMode } = useWallet();
   return (
     <View style={styles.header}>
       <View style={styles.headerIdentity}>
@@ -1036,6 +818,11 @@ function Header({
         </View>
       </View>
       <View style={styles.headerActions}>
+        {demoMode ? (
+          <View style={[styles.statusPill, { backgroundColor: colors.warm }]} testID="demo-badge">
+            <Text style={[styles.statusText, { color: colors.warning }]}>DEMO</Text>
+          </View>
+        ) : null}
         <StatusPill online={online} colors={colors} />
         <HapticPressable onPress={onSettings} style={[styles.iconButton, { borderColor: colors.border }]}>
           <Feather name="sliders" size={18} color={colors.foreground} />
@@ -1047,6 +834,7 @@ function Header({
 
 function BalanceCard({ balance, online, onToggle, label }: { balance: number; online: boolean; onToggle: () => void; label: string }) {
   const colors = useColors();
+  const { demoMode } = useWallet();
   const [hidden, setHidden] = useState(false);
   return (
     <View style={[styles.balanceCard, { backgroundColor: colors.dark }]}>
@@ -1058,10 +846,10 @@ function BalanceCard({ balance, online, onToggle, label }: { balance: number; on
       </View>
       <Text style={styles.balanceAmount}>{hidden ? '••••••' : zar(balance)}</Text>
       <View style={styles.balanceBottom}>
-        <Text style={styles.balanceFoot}>Available balance · ZAR</Text>
+        <Text style={styles.balanceFoot}>{online ? 'Available balance · ZAR' : 'Cached balance - may be out of date'}</Text>
         <View style={styles.secureBadge}>
           <Feather name="shield" size={12} color="#A7F3D0" />
-          <Text style={styles.secureBadgeText}>{online ? 'Demo mode' : 'Saved locally'}</Text>
+          <Text style={styles.secureBadgeText}>{demoMode ? 'Local demo' : online ? 'Test money' : 'Cached copy'}</Text>
         </View>
       </View>
     </View>
@@ -1123,7 +911,7 @@ function HomeScreen({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { merchantBalance, online, toggleOnline, transactions, profile } = useWallet();
+  const { buyerBalance, merchantBalance, online, toggleOnline, transactions, profile } = useWallet();
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
@@ -1136,29 +924,48 @@ function HomeScreen({
         onSettings={() => onNavigate('settings')}
       />
       <BalanceCard
-        balance={merchantBalance}
+        balance={profile.accountType === 'business' ? merchantBalance : buyerBalance}
         online={online}
         onToggle={toggleOnline}
         label={profile.accountType === 'business' ? 'BUSINESS WALLET' : 'PERSONAL WALLET'}
       />
-      <HapticPressable onPress={() => onNavigate('scan')} style={[styles.scanCta, { backgroundColor: colors.button }]}>
-        <View>
-          <Text style={[styles.scanCtaEyebrow, { color: colors.buttonForeground }]}>GET PAID</Text>
-          <Text style={[styles.scanCtaTitle, { color: colors.buttonForeground }]}>Scan customer QR</Text>
-          <Text style={[styles.scanCtaText, { color: colors.buttonForeground }]}>Your customer shows a one-time QR. You scan once.</Text>
-        </View>
-        <View style={[styles.scanCtaIcon, { backgroundColor: colors.buttonForeground }]}>
-          <Feather name="maximize" size={25} color={colors.button} />
-        </View>
-      </HapticPressable>
+      {profile.accountType === 'business' ? (
+        <HapticPressable onPress={() => onNavigate('scan')} style={[styles.scanCta, { backgroundColor: colors.button }]}>
+          <View style={styles.scanCtaCopy}>
+            <Text style={[styles.scanCtaEyebrow, { color: colors.buttonForeground }]}>GET PAID</Text>
+            <Text style={[styles.scanCtaTitle, { color: colors.buttonForeground }]}>Scan customer QR</Text>
+            <Text style={[styles.scanCtaText, { color: colors.buttonForeground }]}>Your customer shows a one-time QR. You scan once.</Text>
+          </View>
+          <View style={[styles.scanCtaIcon, { backgroundColor: colors.buttonForeground }]}>
+            <Feather name="maximize" size={25} color={colors.button} />
+          </View>
+        </HapticPressable>
+      ) : (
+        <HapticPressable onPress={() => onNavigate('pay')} style={[styles.scanCta, { backgroundColor: colors.button }]}>
+          <View style={styles.scanCtaCopy}>
+            <Text style={[styles.scanCtaEyebrow, { color: colors.buttonForeground }]}>PAY A TRADER</Text>
+            <Text style={[styles.scanCtaTitle, { color: colors.buttonForeground }]}>Pay with QR</Text>
+            <Text style={[styles.scanCtaText, { color: colors.buttonForeground }]}>Create a one-time QR. The trader scans it to get paid.</Text>
+          </View>
+          <View style={[styles.scanCtaIcon, { backgroundColor: colors.buttonForeground }]}>
+            <Feather name="credit-card" size={25} color={colors.button} />
+          </View>
+        </HapticPressable>
+      )}
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Quick actions</Text>
         <Text style={[styles.sectionHint, { color: colors.mutedForeground }]}>Tap to start</Text>
       </View>
       <View style={styles.actionGrid}>
-        <QuickAction icon="zap" label="Sell VAS" onPress={() => onNavigate('vas')} />
-        <QuickAction icon="credit-card" label="Customer pays" onPress={() => onNavigate('pay')} />
-        <QuickAction icon="download" label="Cash out" onPress={onOpenCashOut} />
+        {profile.accountType === 'business' ? (
+          <>
+            <QuickAction icon="zap" label="Sell VAS" onPress={() => onNavigate('vas')} />
+            <QuickAction icon="credit-card" label="Customer pays" onPress={() => onNavigate('pay')} />
+            <QuickAction icon="download" label="Cash out" onPress={onOpenCashOut} />
+          </>
+        ) : (
+          <QuickAction icon="credit-card" label="Pay a trader" onPress={() => onNavigate('pay')} />
+        )}
       </View>
       <View style={styles.sectionHeader}>
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Recent activity</Text>
@@ -1176,7 +983,7 @@ function HomeScreen({
           <Feather name="wifi-off" size={17} color={colors.warning} />
           <View style={styles.offlineCopy}>
             <Text style={[styles.offlineTitle, { color: colors.foreground }]}>You’re offline</Text>
-            <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>QR demo transactions are saved on this device. No server sync is configured.</Text>
+            <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>Balances shown may be out of date. Payments are unavailable until you reconnect.</Text>
           </View>
         </View>
       ) : null}
@@ -1226,7 +1033,7 @@ function QRCode({ payload }: { payload: QrPayload }) {
 function PayScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buyerBalance, createPaymentRequest, paymentRequest, completePayment, profile, biometricAvailable, biometricLabel } = useWallet();
+  const { buyerBalance, createPaymentRequest, paymentRequest, completePayment, profile } = useWallet();
   const [amount, setAmount] = useState('');
   const [qrVisible, setQrVisible] = useState(false);
   const [seconds, setSeconds] = useState(60);
@@ -1252,8 +1059,8 @@ function PayScreen({ onBack }: { onBack: () => void }) {
     setPinModalVisible(true);
   };
 
-  const handlePinConfirm = (auth: TransactionAuth) => {
-    const request = createPaymentRequest(pendingAmount, auth);
+  const handlePinConfirm = async (enteredPin: string) => {
+    const request = await createPaymentRequest(pendingAmount, enteredPin);
     if (request !== null) {
       setLocalPaymentRequest(request);
       setSeconds(60);
@@ -1261,7 +1068,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
       setPinModalVisible(false);
       setPinError('');
     } else {
-      setPinError('Invalid PIN. Please try again.');
+      setPinError('Could not create the payment request. Check your PIN and connection.');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
@@ -1340,7 +1147,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
               <Text style={[styles.timerText, { color: colors.warning }]}>{seconds}s remaining</Text>
             </View>
             <Text style={[styles.qrInstruction, { color: colors.mutedForeground }]}>
-              Local demo only. Scanning records a one-time transfer on the scanner device; no real money moves.
+              Test money only. The trader's app verifies this code on the pilot server; no real money moves.
             </Text>
             <Text style={[styles.tokenText, { color: colors.mutedForeground }]}>{activeRequest?.token ?? 'tok_demo_pm'}</Text>
           </View>
@@ -1350,9 +1157,8 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         visible={pinModalVisible}
         onConfirm={handlePinConfirm}
         onCancel={() => setPinModalVisible(false)}
-        canUseBiometric={biometricAvailable}
-        biometricLabel={biometricLabel}
         title="Confirm Payment"
+        summary={`Create a ${zar(pendingAmount)} payment request`}
         error={pinError}
         onClearError={() => setPinError('')}
       />
@@ -1363,7 +1169,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
 function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (screen: Screen) => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { completePayment, online, biometricAvailable, biometricLabel } = useWallet();
+  const { completePayment, previewPaymentRequest, online } = useWallet();
 
   const [permissionResponse, requestPermission] = useCameraPermissions();
   const [asked, setAsked] = useState(false);
@@ -1371,6 +1177,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [pinError, setPinError] = useState('');
   const [scannedPayload, setScannedPayload] = useState<QrPayload | null>(null);
+  const [preview, setPreview] = useState<PaymentRequestPreview | null>(null);
   const [scanned, setScanned] = useState(false);
   const [scanError, setScanError] = useState('');
   const [cameraError, setCameraError] = useState(false);
@@ -1386,25 +1193,39 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 
   const resetScan = () => {
     setScannedPayload(null);
+    setPreview(null);
     setScanned(false);
     setScanError('');
     setCameraError(false);
   };
 
-  const processPayload = (payload: QrPayload) => {
+  const processPayload = async (payload: QrPayload) => {
     if (payload.expiresAt <= Date.now()) {
       setScanError('This QR has expired.');
       setScanned(false);
       return;
     }
-    if (!Number.isFinite(payload.amount) || payload.amount <= 0) {
-      setScanError('This request is invalid.');
+    // The QR only carries the token. Amount and payer always come from the
+    // pilot server, so a tampered or replayed QR cannot misstate the payment.
+    const serverPreview = await previewPaymentRequest(payload.token);
+    if (!serverPreview) {
+      setScanError('Could not verify this payment request. Check your connection.');
+      setScanned(false);
+      return;
+    }
+    if (serverPreview.status === 'EXPIRED' || serverPreview.expiresAt <= Date.now()) {
+      setScanError('This QR has expired. Ask the customer to create a new one.');
+      setScanned(false);
+      return;
+    }
+    if (serverPreview.status !== 'OPEN') {
+      setScanError('This QR code has already been used.');
       setScanned(false);
       return;
     }
     setScannedPayload(payload);
+    setPreview(serverPreview);
     setScanError('');
-    setScanned(true);
     setPinModalVisible(true);
   };
 
@@ -1415,12 +1236,22 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       setScanError('That is not a Paymerch QR code.');
       return;
     }
-    processPayload(payload);
+    setScanned(true);
+    void processPayload(payload).catch(() => {
+      setScanned(false);
+      setScanError('Could not verify this payment request. Check your connection.');
+    });
   };
 
-  const handlePinConfirm = (auth: TransactionAuth) => {
+  const handlePinConfirm = async (enteredPin: string) => {
     if (!scannedPayload) return;
-    const outcome = completePayment(scannedPayload, scannedPayload.name, auth);
+    if (!online) {
+      setPinModalVisible(false);
+      resetScan();
+      setScanError('You are offline. Reconnect before accepting a payment.');
+      return;
+    }
+    const outcome = await completePayment(scannedPayload, preview?.payerName ?? '', enteredPin);
     if (outcome === 'SUCCESS') {
       setResult('success');
       setPinModalVisible(false);
@@ -1433,12 +1264,13 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       const messages = {
         INVALID_REQUEST: 'This QR payment request is invalid.',
         EXPIRED: 'This QR has expired. Ask the customer to create a new one.',
-        INSUFFICIENT_BALANCE: 'The local demo payer balance is too low for this payment.',
-        ALREADY_USED: 'This QR has already been used on this device.',
+        INSUFFICIENT_BALANCE: 'The customer does not have enough test money for this payment.',
+        ALREADY_USED: 'This QR code has already been used.',
       } as const;
       setPinModalVisible(false);
       setPinError('');
       setScannedPayload(null);
+      setPreview(null);
       setScanned(false);
       setScanError(messages[outcome]);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -1451,9 +1283,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <View style={[styles.successMark, { backgroundColor: colors.accent }]}>
           <Feather name="check" size={34} color={colors.success} />
         </View>
-        <Text style={[styles.successTitle, { color: colors.foreground }]}>Local payment recorded</Text>
+        <Text style={[styles.successTitle, { color: colors.foreground }]}>Test payment received</Text>
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
-          The local demo payer balance was debited and business balance credited on this device. No real money moved.
+          Test money moved from the customer's wallet to your business wallet on the pilot server. No real money moved.
         </Text>
         <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, { backgroundColor: colors.button }]}>
           <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Back to dashboard</Text>
@@ -1484,9 +1316,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <HapticPressable onPress={onBack} style={styles.scannerBack}>
           <Feather name="arrow-left" size={21} color="#FFFFFF" />
         </HapticPressable>
-        <View>
+        <View style={{ flex: 1, minWidth: 0 }}>
           <Text style={styles.scannerEyebrow}>SELLER MODE</Text>
-          <Text style={styles.scannerTitle}>Scan customer payment</Text>
+          <Text style={styles.scannerTitle} numberOfLines={1}>Scan customer QR</Text>
         </View>
         <StatusPill online={online} colors={colors} />
       </View>
@@ -1522,10 +1354,10 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 
       <View style={styles.scannerCopy}>
         <Text style={styles.scannerHint}>
-          {scannedPayload ? 'Customer payment detected' : canUseCamera ? 'Scan a customer payment QR' : 'Live QR scanner'}
+          {preview ? 'Customer payment detected' : canUseCamera ? 'Scan a customer payment QR' : 'Live QR scanner'}
         </Text>
         <Text style={styles.scannerSubhint}>
-          {scannedPayload ? `${zar(scannedPayload.amount)} · ${scannedPayload.name}` : cameraStatus}
+          {preview ? `${zar(preview.amount)} · ${preview.payerName}` : cameraStatus}
         </Text>
       </View>
 
@@ -1545,8 +1377,8 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       )}
       <Text style={styles.scannerFootnote}>
         {canUseCamera
-          ? 'Local demo only: confirms a one-time QR and updates balances on this device. No real money moves.'
-          : 'Payments can only be collected by scanning a valid, unexpired Paymerch demo QR.'}
+          ? 'Test money only: the pilot server verifies the one-time QR and updates both wallets.'
+          : 'Payments can only be collected by scanning a valid, unexpired Paymerch QR.'}
       </Text>
       <PinConfirmationModal
         visible={pinModalVisible}
@@ -1555,9 +1387,8 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           setPinModalVisible(false);
           if (!scanned) resetScan();
         }}
-        canUseBiometric={biometricAvailable}
-        biometricLabel={biometricLabel}
         title="Confirm Payment"
+        summary={preview ? `Accept ${zar(preview.amount)} from ${preview.payerName}` : undefined}
         error={pinError}
         onClearError={() => setPinError('')}
       />
@@ -1568,7 +1399,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 function VasScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buyerBalance, vendVas, biometricAvailable, biometricLabel } = useWallet();
+  const { buyerBalance, vendVas } = useWallet();
   const [kind, setKind] = useState<'VAS_ELEC' | 'VAS_AIRTIME'>('VAS_ELEC');
   const [destination, setDestination] = useState('');
   const [amount, setAmount] = useState(50);
@@ -1592,8 +1423,8 @@ function VasScreen({ onBack }: { onBack: () => void }) {
     setPinModalVisible(true);
   };
 
-  const handlePinConfirm = (auth: TransactionAuth) => {
-    const result = vendVas(kind, amount, destination, auth);
+  const handlePinConfirm = (_enteredPin: string) => {
+    const result = vendVas(kind, amount, destination);
     if (result === 'INVALID_PIN') {
       setError('Invalid PIN. Please try again.');
       return;
@@ -1690,20 +1521,18 @@ function VasScreen({ onBack }: { onBack: () => void }) {
         ))}
       </View>
       {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
-      <HapticPressable onPress={vend} style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 28 }]}>
+      <HapticPressable disabled style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 28, opacity: 0.5 }]}>
         <Feather name="zap" size={18} color={colors.buttonForeground} />
         <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Generate {kind === 'VAS_ELEC' ? 'electricity token' : 'airtime'}</Text>
       </HapticPressable>
       <View style={[styles.infoBanner, { backgroundColor: colors.accent }]}>
         <Feather name="info" size={16} color={colors.accentForeground} />
-        <Text style={[styles.infoText, { color: colors.accentForeground }]}>VAS sales are recorded in your wallet activity. Offline sales will show as pending until synced.</Text>
+        <Text style={[styles.infoText, { color: colors.accentForeground }]}>VAS vending is not part of this pilot build yet. Airtime and electricity return in a later stage.</Text>
       </View>
       <PinConfirmationModal
         visible={pinModalVisible}
         onConfirm={handlePinConfirm}
         onCancel={() => setPinModalVisible(false)}
-        canUseBiometric={biometricAvailable}
-        biometricLabel={biometricLabel}
         title="Confirm VAS Transaction"
         error={error}
         onClearError={() => setError('')}
@@ -1740,7 +1569,7 @@ function ActivityScreen({ onBack }: { onBack: () => void }) {
 function SettingsScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory, profile } = useWallet();
+  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory, profile, demoMode, switchDemoProfile, exitDemoMode } = useWallet();
   const pending = transactions.filter((transaction) => transaction.status === 'PENDING SYNC').length;
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 30 }]}>
@@ -1761,24 +1590,28 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
           <Text style={styles.settingsPhone}>{profile.phone}</Text>
         </View>
       </View>
-      <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>LINKED BANK ACCOUNT</Text>
-      <View style={[styles.linkedBankCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-        <View style={[styles.linkedBankIcon, { backgroundColor: colors.accent }]}>
-          <Feather name="credit-card" size={18} color={colors.accentForeground} />
-        </View>
-        <View style={styles.linkedBankCopy}>
-          <Text style={[styles.linkedBankName, { color: colors.foreground }]}>{profile.bankName ?? 'No bank account added'}</Text>
-          <Text style={[styles.linkedBankMeta, { color: colors.mutedForeground }]}>
-            {profile.bankAccountNumber
-              ? `${profile.bankAccountType ?? 'Bank account'} · •••• ${profile.bankAccountNumber.slice(-4)}`
-              : 'Add bank details during wallet registration'}
-          </Text>
-          {profile.bankAccountHolder ? (
-            <Text style={[styles.linkedBankMeta, { color: colors.mutedForeground }]}>{profile.bankAccountHolder}</Text>
-          ) : null}
-        </View>
-        {profile.bankName ? <Feather name="check-circle" size={19} color={colors.success} /> : null}
-      </View>
+      {demoMode ? (
+        <>
+          <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>DEMO MODE</Text>
+          <View style={[styles.settingsCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <View style={styles.settingRow}>
+              <View style={[styles.settingIcon, { backgroundColor: colors.warm }]}><Feather name="play-circle" size={17} color={colors.warning} /></View>
+              <View style={styles.settingCopy}>
+                <Text style={[styles.settingTitle, { color: colors.foreground }]}>Demo mode is on</Text>
+                <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>Prepared dummy profiles. Test money on this device only.</Text>
+              </View>
+            </View>
+            <HapticPressable onPress={() => void switchDemoProfile()} style={[styles.syncButton, { backgroundColor: colors.muted }]} testID="switch-demo-profile">
+              <Feather name="repeat" size={15} color={colors.foreground} />
+              <Text style={[styles.syncButtonText, { color: colors.foreground }]}>Switch to {profile.accountType === 'business' ? 'Demo Buyer' : 'Demo Trader'}</Text>
+            </HapticPressable>
+            <HapticPressable onPress={() => void exitDemoMode()} style={[styles.syncButton, { backgroundColor: colors.muted }]} testID="exit-demo">
+              <Feather name="log-out" size={15} color={colors.foreground} />
+              <Text style={[styles.syncButtonText, { color: colors.foreground }]}>Exit demo</Text>
+            </HapticPressable>
+          </View>
+        </>
+      ) : null}
       {profile.accountType === 'business' ? (
         <>
           <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>BUSINESS TYPE</Text>
@@ -1840,7 +1673,7 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
       </View>
       <View style={[styles.settingsNote, { backgroundColor: colors.muted }]}>
         <Feather name="info" size={16} color={colors.mutedForeground} />
-        <Text style={[styles.settingsNoteText, { color: colors.mutedForeground }]}>This prototype keeps balances and bank details on-device. Bank transfers are not connected; production deposits and withdrawals require a secure banking integration.</Text>
+        <Text style={[styles.settingsNoteText, { color: colors.mutedForeground }]}>This pilot stores accounts and test balances on the pilot server. No bank details are collected; cash-outs are simulated ledger entries, not bank payouts.</Text>
       </View>
       <HapticPressable onPress={() => void logout()} style={[styles.logoutButton, { borderColor: colors.border }]}>
         <Feather name="log-out" size={17} color={colors.destructive} />
@@ -1885,7 +1718,7 @@ export default function PaymerchHome() {
   const [splashAcknowledged, setSplashAcknowledged] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<DeferredInstallPrompt | null>(null);
   const colors = useColors();
-  const { cashOut, merchantBalance, biometricAvailable, biometricLabel, profile } = useWallet();
+  const { cashOut, merchantBalance, profile } = useWallet();
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -1911,8 +1744,8 @@ export default function PaymerchHome() {
     setInstallPrompt(null);
   };
 
-  const handleCashOutPinConfirm = (auth: TransactionAuth) => {
-    if (cashOut(Number(cashOutAmount), auth)) {
+  const handleCashOutPinConfirm = async (enteredPin: string) => {
+    if (await cashOut(Number(cashOutAmount), enteredPin)) {
       setCashOutVisible(false);
       setPinModalVisible(false);
       setCashOutError('');
@@ -1965,9 +1798,7 @@ export default function PaymerchHome() {
             <View style={[styles.cashOutBankNote, { backgroundColor: colors.warm }]}>
               <Feather name="info" size={15} color={colors.warning} />
               <Text style={[styles.cashOutBankNoteText, { color: colors.foreground }]}>
-                {profile.bankName
-                  ? `Linked bank: ${profile.bankName}. This prototype only simulates a cash-out; it will not transfer funds to your bank.`
-                  : 'No bank account is linked. This prototype only simulates a cash-out and does not transfer funds.'}
+                Test cash-out only: it updates the business wallet balance on the pilot server. No bank details are collected and no real payout happens.
               </Text>
             </View>
             <HapticPressable
@@ -1987,9 +1818,8 @@ export default function PaymerchHome() {
         visible={pinModalVisible}
         onConfirm={handleCashOutPinConfirm}
         onCancel={() => setPinModalVisible(false)}
-        canUseBiometric={biometricAvailable}
-        biometricLabel={biometricLabel}
         title="Confirm Cash Out"
+        summary={`Cash out ${zar(Number(cashOutAmount) || 0)} from your business wallet (test only)`}
         error={cashOutError}
         onClearError={() => setCashOutError('')}
       />
@@ -2152,14 +1982,17 @@ const styles = StyleSheet.create({
   balanceFoot: { fontFamily: 'Montserrat_400Regular', color: '#A7A7A7', fontSize: 12 },
   secureBadge: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   secureBadgeText: { fontFamily: 'Montserrat_500Medium', color: '#A7F3D0', fontSize: 11 },
+  pinSummary: { marginTop: 14, borderRadius: 13, paddingVertical: 11, paddingHorizontal: 16, alignItems: 'center' },
+  pinSummaryText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, textAlign: 'center' },
   pinModal: { borderRadius: 24, padding: 24, width: '90%', maxWidth: 360, alignSelf: 'center' },
   pinModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 },
   pinModalTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 20, marginTop: 4 },
-  scanCta: { borderRadius: 22, minHeight: 112, padding: 18, marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  scanCta: { borderRadius: 22, minHeight: 112, padding: 18, marginTop: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  scanCtaCopy: { flex: 1, minWidth: 0 },
   scanCtaEyebrow: { fontFamily: 'Montserrat_700Bold', fontSize: 10, letterSpacing: 1.1 },
   scanCtaTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 22, marginTop: 6 },
   scanCtaText: { fontFamily: 'Montserrat_400Regular', fontSize: 12, marginTop: 4 },
-  scanCtaIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  scanCtaIcon: { width: 56, height: 56, borderRadius: 18, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 25, marginBottom: 11 },
   sectionTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 16 },
   sectionHint: { fontFamily: 'Montserrat_400Regular', fontSize: 12 },
@@ -2216,10 +2049,10 @@ const styles = StyleSheet.create({
   qrInstruction: { fontFamily: 'Montserrat_400Regular', fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: 15, maxWidth: 280 },
   tokenText: { fontFamily: 'Montserrat_400Regular', fontSize: 9, marginTop: 9 },
   scannerRoot: { flex: 1, paddingHorizontal: 18 },
-  scannerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  scannerHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   scannerBack: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   scannerEyebrow: { fontFamily: 'Montserrat_700Bold', color: '#8A8A8A', fontSize: 10, letterSpacing: 1.2 },
-  scannerTitle: { fontFamily: 'Montserrat_700Bold', color: '#FFFFFF', fontSize: 22, marginTop: 4 },
+  scannerTitle: { fontFamily: 'Montserrat_700Bold', color: '#FFFFFF', fontSize: 20, marginTop: 4 },
   viewfinder: { height: 300, marginTop: 40, position: 'relative', alignItems: 'center', justifyContent: 'center' },
   corner: { position: 'absolute', width: 48, height: 48, borderColor: '#FFFFFF' },
   cornerTopLeft: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 14 },

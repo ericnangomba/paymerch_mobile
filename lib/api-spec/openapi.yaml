@@ -3,13 +3,19 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Paymerch pilot API - labelled test money only, no real funds move
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Registration, login and PIN verification
+  - name: wallet
+    description: Pilot test wallet and ledger
+  - name: payments
+    description: QR payment requests (test money)
 paths:
   /healthz:
     get:
@@ -24,6 +30,256 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+  /auth/register:
+    post:
+      operationId: register
+      tags: [auth]
+      summary: Register an account
+      description: Creates a pilot account with seeded test-money balances and returns a session.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+                $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "409":
+          description: Phone already registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in with phone and PIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+                $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthSession"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+  /auth/verify-pin:
+    post:
+      operationId: verifyPin
+      tags: [auth]
+      summary: Re-verify the account PIN before a transaction
+      description: On success returns a single-use, short-lived reauth token bound to the requested action. Money endpoints require it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+                $ref: "#/components/schemas/VerifyPinRequest"
+      responses:
+        "200":
+          description: PIN check result with an action-bound reauth token when ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyPinResult"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "429":
+          description: Too many PIN attempts; temporarily locked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Invalidate the current session
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OkResponse"
+  /wallet:
+    get:
+      operationId: getWallet
+      tags: [wallet]
+      summary: Current balances and recent test-ledger activity
+      responses:
+        "200":
+          description: Wallet state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletState"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+  /wallet/cash-out:
+    post:
+      operationId: cashOut
+      tags: [wallet]
+      summary: Test cash-out (no real payout)
+      description: Debits the merchant test balance and records a ledger entry. No real money moves.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+                $ref: "#/components/schemas/AmountRequest"
+      responses:
+        "200":
+          description: Updated wallet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletState"
+        "400":
+          description: Invalid amount or insufficient test balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "403":
+          description: Valid action-bound reauth token required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+  /payment-requests:
+    post:
+      operationId: createPaymentRequest
+      tags: [payments]
+      summary: Create a one-time QR payment request (customer)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+                $ref: "#/components/schemas/AmountRequest"
+      responses:
+        "201":
+          description: Created payment request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRequest"
+        "400":
+          description: Invalid amount or insufficient test balance
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "403":
+          description: Valid action-bound reauth token required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+  /payment-requests/{token}:
+    get:
+      operationId: getPaymentRequest
+      tags: [payments]
+      summary: Read a payment request (merchant preview)
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Payment request details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentRequestDetail"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "404":
+          description: Unknown token
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+  /payment-requests/{token}/complete:
+    post:
+      operationId: completePaymentRequest
+      tags: [payments]
+      summary: Complete a scanned payment request (merchant)
+      description: Atomically debits the payer and credits the merchant test wallets; a token completes at most once. Requires a reauth token from verify-pin with action complete-payment.
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+                $ref: "#/components/schemas/CompletePaymentBody"
+      responses:
+        "200":
+          description: Completion result with the merchant's updated wallet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CompletePaymentResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
 components:
   schemas:
     HealthStatus:
@@ -33,4 +289,199 @@ components:
           type: string
       required:
         - status
-
+    ErrorMessage:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+    OkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+      required:
+        - ok
+    Profile:
+      type: object
+      properties:
+        accountType:
+          type: string
+          enum: [individual, business]
+        name:
+          type: string
+        phone:
+          type: string
+        businessCategory:
+          type: string
+        bankName:
+          type: string
+        bankAccountHolder:
+          type: string
+        bankAccountNumber:
+          type: string
+        bankAccountType:
+          type: string
+        bankBranchCode:
+          type: string
+      required:
+        - accountType
+        - name
+        - phone
+    RegisterRequest:
+      allOf:
+        - $ref: "#/components/schemas/Profile"
+        - type: object
+          properties:
+            pin:
+              type: string
+              pattern: '^\d{6}$'
+          required:
+            - pin
+    LoginRequest:
+      type: object
+      properties:
+        phone:
+          type: string
+        pin:
+          type: string
+      required:
+        - phone
+        - pin
+    VerifyPinRequest:
+      type: object
+      properties:
+        pin:
+          type: string
+        action:
+          type: string
+          enum: [create-payment-request, complete-payment, cash-out]
+      required:
+        - pin
+        - action
+    VerifyPinResult:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        reauthToken:
+          type: string
+      required:
+        - ok
+    AuthSession:
+      type: object
+      properties:
+        sessionToken:
+          type: string
+        profile:
+          $ref: "#/components/schemas/Profile"
+        wallet:
+          $ref: "#/components/schemas/WalletState"
+      required:
+        - sessionToken
+        - profile
+        - wallet
+    WalletTransaction:
+      type: object
+      properties:
+        id:
+          type: string
+        kind:
+          type: string
+          enum: [MERCHANT_PAY, VAS_ELEC, VAS_AIRTIME, CASH_OUT]
+        title:
+          type: string
+        subtitle:
+          type: string
+        amount:
+          type: number
+        status:
+          type: string
+          enum: [SUCCESS, FAILED]
+        createdAt:
+          type: number
+        direction:
+          type: string
+          enum: [in, out]
+        reference:
+          type: string
+      required:
+        - id
+        - kind
+        - title
+        - subtitle
+        - amount
+        - status
+        - createdAt
+        - direction
+    WalletState:
+      type: object
+      properties:
+        buyerBalance:
+          type: number
+        merchantBalance:
+          type: number
+        transactions:
+          type: array
+          items:
+            $ref: "#/components/schemas/WalletTransaction"
+      required:
+        - buyerBalance
+        - merchantBalance
+        - transactions
+    AmountRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          exclusiveMinimum: 0
+        reauthToken:
+          type: string
+      required:
+        - amount
+        - reauthToken
+    PaymentRequest:
+      type: object
+      properties:
+        token:
+          type: string
+        amount:
+          type: number
+        expiresAt:
+          type: number
+      required:
+        - token
+        - amount
+        - expiresAt
+    PaymentRequestDetail:
+      allOf:
+        - $ref: "#/components/schemas/PaymentRequest"
+        - type: object
+          properties:
+            payerName:
+              type: string
+            status:
+              type: string
+              enum: [OPEN, COMPLETED, EXPIRED]
+          required:
+            - payerName
+            - status
+    CompletePaymentBody:
+      type: object
+      properties:
+        reauthToken:
+          type: string
+      required:
+        - reauthToken
+    CompletePaymentResponse:
+      type: object
+      properties:
+        result:
+          type: string
+          enum: [SUCCESS, INVALID_REQUEST, EXPIRED, INSUFFICIENT_BALANCE, ALREADY_USED]
+        wallet:
+          $ref: "#/components/schemas/WalletState"
+      required:
+        - result
+        - wallet

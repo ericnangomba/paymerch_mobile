@@ -1,6 +1,6 @@
 # Paymerch Mobile
 
-Paymerch Mobile is a local-first digital wallet prototype for unbanked informal businesses, with PIN access, customer QR payments, VAS vending, and offline sync states.
+Paymerch Mobile is a digital wallet pilot for unbanked informal businesses, with PIN access and buyer-initiated customer QR payments scanned by the trader. A server backend now holds accounts and a labelled test-money ledger; VAS vending is deferred and offline acceptance fails closed. See PILOT.md.
 
 ## Run & Operate
 
@@ -32,7 +32,7 @@ Paymerch Mobile is a local-first digital wallet prototype for unbanked informal 
 
 ## Architecture decisions
 
-- The first build is Expo/frontend-only and uses AsyncStorage so the entire demo works without external accounts or provider credentials.
+- The pilot build is server-backed (see PILOT.md): AsyncStorage keeps only the session token, profile and a read-only cache. Balances and payment checks live on the API server.
 - The payment flow uses customer-generated dynamic QR requests and seller scan simulation, with a local double-entry-style balance shift. Mini-bus fares are supported as one business category alongside other informal businesses.
 - Biometric unlock uses Expo Local Authentication on physical devices and keeps the six-digit PIN as the fallback for web, unsupported devices, and cancelled prompts.
 - Registration supports individual wallets and business wallets, with business categories for spaza shops, street vendors, carwashes, tshisa nyama, street food, produce sellers, and mini-bus taxis.
@@ -49,8 +49,8 @@ No additional preferences recorded.
 
 ## Gotchas
 
-- The demo PIN is `123456`.
-- The first build intentionally keeps balances local; do not treat it as a production ledger or real payment rail.
+- PINs are hashed server-side with scrypt; no PIN is stored on the device.
+- The pilot ledger holds labelled test money only; it is not a production ledger or real payment rail.
 - Expo's local React Native DevTools binary may report a missing `libglib-2.0.so.0` warning in this environment while Metro continues to serve the app.
 
 ## Pointers
