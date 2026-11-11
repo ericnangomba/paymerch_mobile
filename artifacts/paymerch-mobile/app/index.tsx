@@ -540,16 +540,12 @@ function AppSplashScreen({
             },
           ]}
         >
-          <View style={[styles.splashCircle, compactLayout && styles.splashCircleCompact]}>
-            <LogoIcon size={compactLayout ? 50 : 64} />
-          </View>
-          <View style={styles.splashWordmarkRow}>
-            <Text style={[styles.splashWordmark, styles.splashWordmarkPart]}>payme</Text>
-            <View style={styles.splashWordmarkR}>
-              <View style={styles.splashWordmarkDot} />
-              <Text style={[styles.splashWordmark, styles.splashWordmarkPart]}>r</Text>
-            </View>
-            <Text style={[styles.splashWordmark, styles.splashWordmarkPart]}>ch</Text>
+          <View style={[styles.splashBrandCard, compactLayout && styles.splashBrandCardCompact]}>
+            <Image
+              source={logo}
+              style={{ width: compactLayout ? 148 : 172, height: compactLayout ? 148 : 172 }}
+              resizeMode="contain"
+            />
           </View>
           <Text style={styles.splashTagline}>Simply Secure Payments</Text>
         </Animated.View>
@@ -2231,10 +2227,8 @@ const styles = StyleSheet.create({
   splashCircle: { width: 112, height: 112, borderRadius: 56, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.2, shadowRadius: 18, shadowOffset: { width: 0, height: 8 }, elevation: 6 },
   splashCircleCompact: { width: 92, height: 92, borderRadius: 46 },
   splashWordmark: { fontFamily: 'Montserrat_700Bold', fontSize: 34, color: '#FFFFFF', marginTop: 14, textAlign: 'center', letterSpacing: 0.5 },
-  splashWordmarkRow: { flexDirection: 'row', alignItems: 'baseline', marginTop: 14 },
-  splashWordmarkPart: { marginTop: 0 },
-  splashWordmarkR: { position: 'relative' },
-  splashWordmarkDot: { position: 'absolute', top: 5, right: 0, width: 8, height: 8, borderRadius: 4, backgroundColor: '#E87018' },
+  splashBrandCard: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 32, padding: 14, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  splashBrandCardCompact: { marginTop: 8, borderRadius: 26, padding: 10 },
   splashTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.82)', marginTop: 5, textAlign: 'center' },
   splashMiddle: { gap: 18, width: '100%' },
   splashMiddleCompact: { gap: 12 },
