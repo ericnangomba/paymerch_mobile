@@ -15,14 +15,11 @@ await esbuild({
   entryPoints: [path.resolve(artifactDir, "src/api.ts")],
   platform: "node",
   bundle: true,
-  format: "esm",
+  format: "cjs",
   outdir: outDir,
-  outExtension: { ".js": ".mjs" },
+  outExtension: { ".js": ".js" },
   logLevel: "info",
-  banner: {
-    js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
-  },
-  plugins: [esbuildPluginPino({ transports: ["pino-pretty"] })],
+    plugins: [esbuildPluginPino({ transports: ["pino-pretty"] })],
   external: ["*.node", "fsevents", "better-sqlite3", "sqlite3", "sharp", "canvas", "bcrypt", "argon2", "re2", "farmhash"],
 });
 console.log("function bundle written to netlify/functions/api.mjs");
