@@ -385,10 +385,9 @@ function AuthScreen() {
       bounces={false}
     >
       <View style={styles.authTop}>
-        <View style={styles.authLogoCircle}>
-          <LogoIcon size={58} />
+        <View style={styles.authBrandCard}>
+          <Image source={logo} style={{ width: 108, height: 108 }} resizeMode="contain" />
         </View>
-        <Text style={styles.authWordmark}>paymerch</Text>
         <Text style={styles.authTagline}>Simply Secure Payments</Text>
       </View>
       <View style={[styles.authSheet, { backgroundColor: colors.card }]}>
@@ -2249,6 +2248,7 @@ const styles = StyleSheet.create({
   splashPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 28, minHeight: 56, paddingHorizontal: 20, backgroundColor: '#FFFFFF', alignSelf: 'stretch' },
   splashPillText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#0E87A0' },
   authLogoCircle: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
+  authBrandCard: { backgroundColor: '#FFFFFF', borderRadius: 26, padding: 10, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
   authWordmark: { fontFamily: 'Montserrat_700Bold', fontSize: 26, color: '#FFFFFF', marginTop: 12, textAlign: 'center', letterSpacing: 0.5 },
   authTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.82)', textAlign: 'center' },
   authSheet: { borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 24, paddingTop: 28, marginTop: 26, alignItems: 'center', width: '100%' },
