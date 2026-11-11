@@ -19,7 +19,7 @@ await esbuild({
   outdir: outDir,
   outExtension: { ".js": ".js" },
   logLevel: "info",
-    plugins: [esbuildPluginPino({ transports: ["pino-pretty"] })],
-  external: ["*.node", "fsevents", "better-sqlite3", "sqlite3", "sharp", "canvas", "bcrypt", "argon2", "re2", "farmhash"],
+  define: { "process.env.NODE_ENV": "\"production\"" },
+    external: ["*.node", "fsevents", "better-sqlite3", "sqlite3", "sharp", "canvas", "bcrypt", "argon2", "re2", "farmhash"],
 });
 console.log("function bundle written to netlify/functions/api.mjs");
