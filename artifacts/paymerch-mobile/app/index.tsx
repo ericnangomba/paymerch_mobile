@@ -74,9 +74,9 @@ type SaBank = (typeof saBanks)[number];
 const findBank = (name?: string): SaBank | undefined => saBanks.find((bank) => bank.name === name);
 
 const maskAccount = (num?: string): string => {
-  if (!num) return 'Account on file';
+  if (!num) return 'No account linked';
   const digits = num.replace(/\D/g, '');
-  return digits.length >= 4 ? `\u2022\u2022 ${digits.slice(-4)}` : 'Account on file';
+  return digits.length >= 4 ? `\u2022\u2022 ${digits.slice(-4)}` : 'No account linked';
 };
 
 const businessCategoryIcons: Record<BusinessCategory, IconName> = {
