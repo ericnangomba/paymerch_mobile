@@ -312,7 +312,7 @@ function PinConfirmationModal({
   );
 }
 
-function AuthScreen() {
+function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType | null }) {
   const colors = useColors();
   const { login, biometricLogin, isRegistered, biometricAvailable, biometricLabel, verifyBiometrics, enterDemoMode } = useWallet();
   const [mode, setMode] = useState<'login' | 'register'>('login');
@@ -367,6 +367,7 @@ function AuthScreen() {
   if (mode === 'register') {
     return (
       <RegistrationScreen
+        initialAccountType={initialAccountType}
         onBack={() => setMode('login')}
         onRegistered={() => {
           setMode('login');
@@ -458,9 +459,11 @@ function AuthScreen() {
 function AppSplashScreen({
   onContinue,
   onInstall,
+  onWatchDemo,
 }: {
-  onContinue: () => void;
+  onContinue: (role: AccountType) => void;
   onInstall?: () => void;
+  onWatchDemo: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
@@ -545,44 +548,28 @@ function AppSplashScreen({
             ]}
             resizeMode="contain"
           />
-          <Text style={styles.splashTagline}>Get paid with one scan.</Text>
+          <Text style={styles.splashHeadline}>Get paid with one scan.</Text>
+          <Text style={styles.splashSubline}>No card machine. No printed code. Your phone is the till.</Text>
         </Animated.View>
 
         <Animated.View style={[styles.splashMiddle, compactLayout && styles.splashMiddleCompact, { opacity: actionOpacity }]}>
-          <View style={styles.splashActionsRow}>
-            <View style={styles.splashActionItem}>
-              <View style={styles.splashActionCircle}>
-                <Feather name="zap" size={20} color="#A0630A" />
-              </View>
-              <Text style={styles.splashActionLabel}>Pay fast</Text>
-            </View>
-            <View style={styles.splashActionItem}>
-              <View style={styles.splashActionCircle}>
-                <Feather name="maximize" size={20} color="#A0630A" />
-              </View>
-              <Text style={styles.splashActionLabel}>One-time QR</Text>
-            </View>
-            <View style={styles.splashActionItem}>
-              <View style={styles.splashActionCircle}>
-                <Feather name="lock" size={20} color="#A0630A" />
-              </View>
-              <Text style={styles.splashActionLabel}>PIN secured</Text>
-            </View>
-          </View>
-
-          <View style={styles.splashCard}>
-            <View style={styles.splashCardTop}>
-              <LogoIcon size={28} />
-              <Text style={styles.splashCardLabel}>PAYMERCH WALLET</Text>
-            </View>
-            <Text style={styles.splashCardAmount}>R ••••</Text>
-            <Text style={styles.splashCardFoot}>Test-money pilot · no real payments</Text>
-          </View>
-
-          <HapticPressable onPress={onContinue} style={styles.splashPill} testID="splash-get-started">
-            <Text style={styles.splashPillText}>Get started</Text>
+          <HapticPressable onPress={() => onContinue('business')} style={styles.splashPill} testID="splash-receive-payments">
+            <Text style={styles.splashPillText}>Receive payments</Text>
             <Feather name="arrow-right" size={18} color="#211A12" />
           </HapticPressable>
+          <HapticPressable onPress={() => onContinue('individual')} style={styles.splashSecondaryCta} testID="splash-pay-trader">
+            <Text style={styles.splashSecondaryCtaText}>Pay a trader with QR</Text>
+          </HapticPressable>
+          <HapticPressable onPress={onWatchDemo} style={styles.splashInstallAction} testID="splash-watch-demo">
+            <Text style={styles.splashQuietLink}>Watch a demo payment first</Text>
+          </HapticPressable>
+          <View style={styles.splashChipsRow}>
+            {['Spaza shop', 'Tshisa nyama', 'Taxi', 'Street vendor'].map((chip) => (
+              <View key={chip} style={styles.splashChip}>
+                <Text style={styles.splashChipText}>{chip}</Text>
+              </View>
+            ))}
+          </View>
           {onInstall ? (
             <HapticPressable onPress={onInstall} style={styles.splashInstallAction} testID="splash-install">
               <Feather name="download" size={16} color="#453F33" />
@@ -591,7 +578,7 @@ function AppSplashScreen({
           ) : null}
           <View style={styles.splashSecurityNote}>
             <Feather name="shield" size={13} color="#6B6558" />
-            <Text style={styles.splashSecurityText}>Pilot build: secured with your 6-digit PIN</Text>
+            <Text style={styles.splashSecurityText}>Test-money pilot · no real payments · secured with your 6-digit PIN</Text>
           </View>
         </Animated.View>
       </ScrollView>
@@ -605,11 +592,11 @@ function AppSplashScreen({
   return splashContent;
 }
 
-function RegistrationScreen({ onBack, onRegistered }: { onBack: () => void; onRegistered: () => void }) {
+function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBack: () => void; onRegistered: () => void; initialAccountType?: AccountType | null }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { registerAccount, enterDemoMode } = useWallet();
-  const [accountType, setAccountType] = useState<AccountType>('business');
+  const [accountType, setAccountType] = useState<AccountType>(initialAccountType ?? 'business');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState<BusinessCategory>('Spaza shop');
@@ -1341,22 +1328,12 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         <View style={[styles.successMark, { backgroundColor: colors.button }]}>
           <Feather name="check" size={38} color="#211A12" />
         </View>
-        <Text style={[styles.successTitle, { color: colors.foreground }]}>Test payment received</Text>
+        <Text style={[styles.successKicker, { color: colors.mutedForeground }]}>TEST PAYMENT RECEIVED</Text>
+        {preview ? <Text style={[styles.successAmount, { color: colors.foreground }]}>{zar(preview.amount)}</Text> : null}
         {preview ? (
-          <View style={[styles.resultCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <View style={styles.resultRow}>
-              <Text style={[styles.resultRowLabel, { color: colors.mutedForeground }]}>Amount</Text>
-              <Text style={[styles.resultRowValue, { color: colors.foreground }]}>{zar(preview.amount)}</Text>
-            </View>
-            <View style={styles.resultRow}>
-              <Text style={[styles.resultRowLabel, { color: colors.mutedForeground }]}>From</Text>
-              <Text style={[styles.resultRowValue, { color: colors.foreground }]}>{preview.payerName}</Text>
-            </View>
-            <View style={styles.resultRow}>
-              <Text style={[styles.resultRowLabel, { color: colors.mutedForeground }]}>Status</Text>
-              <Text style={[styles.resultRowValue, { color: colors.success }]}>Completed · test money</Text>
-            </View>
-          </View>
+          <Text style={[styles.successFrom, { color: colors.mutedForeground }]}>
+            From {preview.payerName} · <Text style={{ color: colors.success, fontFamily: 'Montserrat_600SemiBold' }}>Completed · test money</Text>
+          </Text>
         ) : null}
         <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
           {demoMode
@@ -1819,9 +1796,10 @@ export default function PaymerchHome() {
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [cashOutError, setCashOutError] = useState('');
   const [splashAcknowledged, setSplashAcknowledged] = useState(false);
+  const [preferredAccountType, setPreferredAccountType] = useState<AccountType | null>(null);
   const [installPrompt, setInstallPrompt] = useState<DeferredInstallPrompt | null>(null);
   const colors = useColors();
-  const { cashOut, merchantBalance, profile } = useWallet();
+  const { cashOut, merchantBalance, profile, enterDemoMode } = useWallet();
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -1861,12 +1839,19 @@ export default function PaymerchHome() {
   if (!splashAcknowledged || !ready) {
     return (
       <AppSplashScreen
-        onContinue={() => setSplashAcknowledged(true)}
+        onContinue={(role) => {
+          setPreferredAccountType(role);
+          setSplashAcknowledged(true);
+        }}
         onInstall={installPrompt ? () => void installApp() : undefined}
+        onWatchDemo={() => {
+          setSplashAcknowledged(true);
+          void enterDemoMode();
+        }}
       />
     );
   }
-  if (!signedIn) return <AuthScreen />;
+  if (!signedIn) return <AuthScreen initialAccountType={preferredAccountType} />;
 
   const navigate = (next: Screen) => {
     setCashOutVisible(false);
@@ -2174,6 +2159,9 @@ const styles = StyleSheet.create({
   successRoot: { flex: 1, paddingHorizontal: 24, alignItems: 'center', justifyContent: 'center' },
   successMark: { width: 84, height: 84, borderRadius: 42, alignItems: 'center', justifyContent: 'center' },
   successTitle: { fontFamily: 'Montserrat_700Bold', fontSize: 26, marginTop: 20 },
+  successKicker: { fontFamily: 'Montserrat_700Bold', fontSize: 12, letterSpacing: 1.4, marginTop: 18 },
+  successAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 44, letterSpacing: -1, marginTop: 6 },
+  successFrom: { fontFamily: 'Montserrat_400Regular', fontSize: 14, marginTop: 6 },
   successSubtitle: { fontFamily: 'Montserrat_400Regular', textAlign: 'center', lineHeight: 20, fontSize: 14, marginTop: 10, maxWidth: 300 },
   textButton: { padding: 15, marginTop: 6 },
   textButtonLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
@@ -2247,6 +2235,14 @@ const styles = StyleSheet.create({
   splashCardFoot: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6B6558', marginTop: 8 },
   splashPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 28, minHeight: 56, paddingHorizontal: 20, backgroundColor: '#E9A820', alignSelf: 'stretch', shadowColor: '#6B4E0A', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
   splashPillText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#211A12' },
+  splashHeadline: { fontFamily: 'Montserrat_700Bold', fontSize: 26, lineHeight: 32, color: '#211A12', textAlign: 'center', marginTop: 18 },
+  splashSubline: { fontFamily: 'Montserrat_400Regular', fontSize: 14, lineHeight: 20, color: '#5F594D', textAlign: 'center', marginTop: 8, maxWidth: 300 },
+  splashSecondaryCta: { minHeight: 52, borderRadius: 26, borderWidth: 1.5, borderColor: '#D9CDB0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
+  splashSecondaryCtaText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#211A12' },
+  splashQuietLink: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#57534A' },
+  splashChipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
+  splashChip: { backgroundColor: '#ECE3CD', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
+  splashChipText: { fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#453F33' },
   authLogoCircle: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
   authBrandCard: { backgroundColor: '#FFFFFF', borderRadius: 26, padding: 10, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
   authWordmark: { fontFamily: 'Montserrat_700Bold', fontSize: 26, color: '#FFFFFF', marginTop: 12, textAlign: 'center', letterSpacing: 0.5 },
