@@ -9,7 +9,7 @@
       "image": "./assets/images/mlogo.png",
       "imageWidth": 160,
       "resizeMode": "contain",
-      "backgroundColor": "#FBFBFA"
+      "backgroundColor": "#F8F1E2"
     },
     "scheme": "paymerch-mobile",
     "userInterfaceStyle": "automatic",

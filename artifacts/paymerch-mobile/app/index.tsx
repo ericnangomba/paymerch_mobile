@@ -379,16 +379,14 @@ function AuthScreen() {
 
   const authContent = (
     <ScrollView
-      style={[styles.authRoot, { backgroundColor: colors.primary }]}
+      style={[styles.authRoot, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.authScrollContent}
       showsVerticalScrollIndicator={false}
       bounces={false}
     >
       <View style={styles.authTop}>
-        <View style={styles.authBrandCard}>
-          <Image source={logo} style={{ width: 108, height: 108 }} resizeMode="contain" />
-        </View>
-        <Text style={styles.authTagline}>Simply Secure Payments</Text>
+        <Image source={logo} style={{ width: 210, height: 63, marginTop: 8 }} resizeMode="contain" />
+        <Text style={styles.authTagline}>Get paid with one scan.</Text>
       </View>
       <View style={[styles.authSheet, { backgroundColor: colors.card }]}>
         <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>WELCOME BACK</Text>
@@ -510,7 +508,7 @@ function AppSplashScreen({
 
   const splashContent = (
     <LinearGradient
-      colors={['#106080', '#2080A0', '#40B0B0']}
+      colors={['#F8F1E2', '#F3E9CF', '#F8F1E2']}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.splashGradient}
@@ -539,33 +537,34 @@ function AppSplashScreen({
             },
           ]}
         >
-          <View style={[styles.splashBrandCard, compactLayout && styles.splashBrandCardCompact]}>
-            <Image
-              source={logo}
-              style={{ width: compactLayout ? 148 : 172, height: compactLayout ? 148 : 172 }}
-              resizeMode="contain"
-            />
-          </View>
-          <Text style={styles.splashTagline}>Simply Secure Payments</Text>
+          <Image
+            source={logo}
+            style={[
+              { width: compactLayout ? 190 : 228, height: compactLayout ? 57 : 68 },
+              compactLayout ? { marginTop: 8 } : { marginTop: 14 },
+            ]}
+            resizeMode="contain"
+          />
+          <Text style={styles.splashTagline}>Get paid with one scan.</Text>
         </Animated.View>
 
         <Animated.View style={[styles.splashMiddle, compactLayout && styles.splashMiddleCompact, { opacity: actionOpacity }]}>
           <View style={styles.splashActionsRow}>
             <View style={styles.splashActionItem}>
               <View style={styles.splashActionCircle}>
-                <Feather name="zap" size={20} color="#FFFFFF" />
+                <Feather name="zap" size={20} color="#A0630A" />
               </View>
               <Text style={styles.splashActionLabel}>Pay fast</Text>
             </View>
             <View style={styles.splashActionItem}>
               <View style={styles.splashActionCircle}>
-                <Feather name="maximize" size={20} color="#FFFFFF" />
+                <Feather name="maximize" size={20} color="#A0630A" />
               </View>
               <Text style={styles.splashActionLabel}>One-time QR</Text>
             </View>
             <View style={styles.splashActionItem}>
               <View style={styles.splashActionCircle}>
-                <Feather name="lock" size={20} color="#FFFFFF" />
+                <Feather name="lock" size={20} color="#A0630A" />
               </View>
               <Text style={styles.splashActionLabel}>PIN secured</Text>
             </View>
@@ -582,16 +581,16 @@ function AppSplashScreen({
 
           <HapticPressable onPress={onContinue} style={styles.splashPill} testID="splash-get-started">
             <Text style={styles.splashPillText}>Get started</Text>
-            <Feather name="arrow-right" size={18} color="#2080A0" />
+            <Feather name="arrow-right" size={18} color="#211A12" />
           </HapticPressable>
           {onInstall ? (
             <HapticPressable onPress={onInstall} style={styles.splashInstallAction} testID="splash-install">
-              <Feather name="download" size={16} color="#FFFFFF" />
+              <Feather name="download" size={16} color="#453F33" />
               <Text style={styles.splashInstallText}>Install Paymerch</Text>
             </HapticPressable>
           ) : null}
           <View style={styles.splashSecurityNote}>
-            <Feather name="shield" size={13} color="rgba(255,255,255,0.8)" />
+            <Feather name="shield" size={13} color="#6B6558" />
             <Text style={styles.splashSecurityText}>Pilot build: secured with your 6-digit PIN</Text>
           </View>
         </Animated.View>
@@ -863,7 +862,7 @@ function Header({
           </View>
         ) : null}
         <View style={[styles.statusPill, { backgroundColor: 'rgba(255,255,255,0.18)' }]}>
-          <View style={[styles.statusDot, { backgroundColor: online ? '#5EEAD4' : '#FCD34D' }]} />
+          <View style={[styles.statusDot, { backgroundColor: online ? '#8FCB81' : '#FCD34D' }]} />
           <Text style={[styles.statusText, { color: '#FFFFFF' }]}>
             {online ? 'Online' : 'Offline'}
           </Text>
@@ -961,7 +960,7 @@ function HomeScreen({
       contentContainerStyle={{ paddingBottom: 124 }}
     >
       <LinearGradient
-        colors={['#106080', '#2080A0']}
+        colors={['#211A12', '#3A2E1A']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.homeBand, { paddingTop: insets.top + 18 }]}
@@ -1340,7 +1339,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
     return (
       <View style={[styles.successRoot, { backgroundColor: colors.background, paddingTop: insets.top + 18 }]}>
         <View style={[styles.successMark, { backgroundColor: colors.button }]}>
-          <Feather name="check" size={38} color="#FFFFFF" />
+          <Feather name="check" size={38} color="#211A12" />
         </View>
         <Text style={[styles.successTitle, { color: colors.foreground }]}>Test payment received</Text>
         {preview ? (
@@ -1363,6 +1362,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           {demoMode
             ? "Test money moved from the customer's wallet to your business wallet in the local demo on this device. No real money moved."
             : "Test money moved from the customer's wallet to your business wallet on the pilot server. No real money moved."}
+          {"\n\n"}Your proof is the confirmed transaction in your own app - never a screen someone shows you.
         </Text>
         <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, styles.resultButton, { backgroundColor: colors.button }]}>
           <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Done</Text>
@@ -1619,7 +1619,7 @@ function VasScreen({ onBack }: { onBack: () => void }) {
       <View style={styles.vasOptions}>
         {options.map((option) => (
           <HapticPressable key={option} onPress={() => setAmount(option)} style={[styles.vasOption, { backgroundColor: amount === option ? colors.foreground : colors.card, borderColor: amount === option ? colors.foreground : colors.border }]}>
-            <Text style={[styles.vasOptionText, { color: amount === option ? colors.primaryForeground : colors.foreground }]}>R{option}</Text>
+            <Text style={[styles.vasOptionText, { color: amount === option ? '#F8F1E2' : colors.foreground }]}>R{option}</Text>
           </HapticPressable>
         ))}
       </View>
@@ -1801,7 +1801,7 @@ function BottomNav({ screen, onNavigate }: { screen: Screen; onNavigate: (screen
         return (
           <HapticPressable key={item.key} onPress={() => onNavigate(item.key)} style={styles.navItem}>
             <View style={[styles.navIcon, active && { backgroundColor: colors.button }]}>
-              <Feather name={item.icon} size={18} color={active ? colors.primaryForeground : colors.mutedForeground} />
+              <Feather name={item.icon} size={18} color={active ? colors.buttonForeground : colors.mutedForeground} />
             </View>
             <Text style={[styles.navLabel, { color: active ? colors.foreground : colors.mutedForeground }]}>{item.label}</Text>
           </HapticPressable>
@@ -1943,7 +1943,7 @@ export default function PaymerchHome() {
 
 const styles = StyleSheet.create({
   appRoot: { flex: 1, maxWidth: 480, alignSelf: 'center', width: '100%' },
-  webContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FBFBFA' },
+  webContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4EDDC' },
   loadingRoot: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 14 },
   loadingText: { fontFamily: 'Montserrat_500Medium', fontSize: 14 },
   splashScroll: { flex: 1, width: '100%' },
@@ -2053,7 +2053,7 @@ const styles = StyleSheet.create({
   pinVisibilityButton: { width: 30, height: 38, alignItems: 'center', justifyContent: 'center' },
   registrationError: { flexDirection: 'row', alignItems: 'center', gap: 9, borderRadius: 13, paddingHorizontal: 12, paddingVertical: 11, marginTop: 15 },
   registrationErrorText: { flex: 1, fontFamily: 'Montserrat_500Medium', fontSize: 12, lineHeight: 17 },
-  registrationSubmitButton: { minHeight: 58, borderRadius: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 19, marginTop: 23, shadowColor: '#006F70', shadowOpacity: 0.17, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
+  registrationSubmitButton: { minHeight: 58, borderRadius: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingHorizontal: 19, marginTop: 23, shadowColor: '#6B4E0A', shadowOpacity: 0.17, shadowRadius: 10, shadowOffset: { width: 0, height: 5 }, elevation: 3 },
   registrationSubmitText: { flex: 1, fontFamily: 'Montserrat_700Bold', fontSize: 15, textAlign: 'center' },
   registrationNoteCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, borderWidth: 1, borderRadius: 14, padding: 13, marginTop: 14 },
   registrationNote: { flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 11, lineHeight: 16 },
@@ -2163,7 +2163,7 @@ const styles = StyleSheet.create({
   cornerTopRight: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 14 },
   cornerBottomLeft: { bottom: 0, left: 0, borderBottomWidth: 3, borderLeftWidth: 3, borderBottomLeftRadius: 14 },
   cornerBottomRight: { bottom: 0, right: 0, borderBottomWidth: 3, borderRightWidth: 3, borderBottomRightRadius: 14 },
-  scanLine: { position: 'absolute', top: '49%', left: 28, right: 28, height: 1, backgroundColor: '#10B981' },
+  scanLine: { position: 'absolute', top: '49%', left: 28, right: 28, height: 2, backgroundColor: '#E9A820' },
   viewfinderCenter: { width: 80, height: 80, borderRadius: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.28)', alignItems: 'center', justifyContent: 'center' },
   scannerCopy: { alignItems: 'center', marginTop: 34 },
   scannerHint: { fontFamily: 'Montserrat_600SemiBold', color: '#FFFFFF', fontSize: 16 },
@@ -2233,32 +2233,32 @@ const styles = StyleSheet.create({
   splashWordmark: { fontFamily: 'Montserrat_700Bold', fontSize: 34, color: '#FFFFFF', marginTop: 14, textAlign: 'center', letterSpacing: 0.5 },
   splashBrandCard: { marginTop: 14, backgroundColor: '#FFFFFF', borderRadius: 32, padding: 14, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
   splashBrandCardCompact: { marginTop: 8, borderRadius: 26, padding: 10 },
-  splashTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: 'rgba(255,255,255,0.82)', marginTop: 5, textAlign: 'center' },
+  splashTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 13, color: '#5F594D', marginTop: 8, textAlign: 'center' },
   splashMiddle: { gap: 18, width: '100%' },
   splashMiddleCompact: { gap: 12 },
   splashActionsRow: { flexDirection: 'row', justifyContent: 'space-evenly', width: '100%' },
   splashActionItem: { alignItems: 'center', minWidth: 84 },
-  splashActionCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
-  splashActionLabel: { fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#FFFFFF', marginTop: 8, textAlign: 'center' },
+  splashActionCircle: { width: 56, height: 56, borderRadius: 28, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#4A3A1A', shadowOpacity: 0.1, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 3 },
+  splashActionLabel: { fontFamily: 'Montserrat_500Medium', fontSize: 11, color: '#453F33', marginTop: 8, textAlign: 'center' },
   splashCard: { backgroundColor: '#FFFFFF', borderRadius: 22, padding: 18, width: '100%' },
   splashCardTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  splashCardLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, letterSpacing: 1.4, color: '#5E737B' },
-  splashCardAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 30, letterSpacing: -0.8, color: '#0B1F2A', marginTop: 12 },
-  splashCardFoot: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#5E737B', marginTop: 8 },
-  splashPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 28, minHeight: 56, paddingHorizontal: 20, backgroundColor: '#FFFFFF', alignSelf: 'stretch' },
-  splashPillText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#0E87A0' },
+  splashCardLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, letterSpacing: 1.4, color: '#6B6558' },
+  splashCardAmount: { fontFamily: 'Montserrat_700Bold', fontSize: 30, letterSpacing: -0.8, color: '#181410', marginTop: 12 },
+  splashCardFoot: { fontFamily: 'Montserrat_400Regular', fontSize: 11, color: '#6B6558', marginTop: 8 },
+  splashPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 28, minHeight: 56, paddingHorizontal: 20, backgroundColor: '#E9A820', alignSelf: 'stretch', shadowColor: '#6B4E0A', shadowOpacity: 0.25, shadowRadius: 14, shadowOffset: { width: 0, height: 5 }, elevation: 4 },
+  splashPillText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#211A12' },
   authLogoCircle: { width: 96, height: 96, borderRadius: 48, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
   authBrandCard: { backgroundColor: '#FFFFFF', borderRadius: 26, padding: 10, alignItems: 'center', justifyContent: 'center', shadowColor: '#053D3D', shadowOpacity: 0.18, shadowRadius: 14, shadowOffset: { width: 0, height: 6 }, elevation: 5 },
   authWordmark: { fontFamily: 'Montserrat_700Bold', fontSize: 26, color: '#FFFFFF', marginTop: 12, textAlign: 'center', letterSpacing: 0.5 },
-  authTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: 'rgba(255,255,255,0.82)', textAlign: 'center' },
+  authTagline: { fontFamily: 'Montserrat_400Regular', fontSize: 12, color: '#5F594D', marginTop: 10, textAlign: 'center' },
   authSheet: { borderTopLeftRadius: 30, borderTopRightRadius: 30, paddingHorizontal: 24, paddingTop: 28, marginTop: 26, alignItems: 'center', width: '100%' },
-  headerLogoCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
+  headerLogoCircle: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E9A820', alignItems: 'center', justifyContent: 'center' },
   headerTitleOnTeal: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#FFFFFF' },
   headerSubtitleOnTeal: { fontFamily: 'Montserrat_400Regular', fontSize: 12, marginTop: 3, color: 'rgba(255,255,255,0.78)' },
   headerSettingsButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderRadius: 12, borderColor: 'rgba(255,255,255,0.35)' },
   homeBand: { paddingHorizontal: 18, paddingBottom: 24, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   homeBody: { paddingHorizontal: 18 },
-  balanceCardWhite: { borderRadius: 24, padding: 19, marginTop: 18, minHeight: 148, backgroundColor: '#FFFFFF', shadowColor: '#0B3B4A', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
+  balanceCardWhite: { borderRadius: 24, padding: 19, marginTop: 18, minHeight: 148, backgroundColor: '#FFFFFF', shadowColor: '#3A2E1A', shadowOpacity: 0.12, shadowRadius: 16, shadowOffset: { width: 0, height: 6 }, elevation: 4 },
   balanceAmountDark: { fontFamily: 'Montserrat_700Bold', fontSize: 34, letterSpacing: -1.2, marginTop: 19 },
   secureBadgeLight: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 5 },
   secureBadgeTextLight: { fontFamily: 'Montserrat_500Medium', fontSize: 11 },
