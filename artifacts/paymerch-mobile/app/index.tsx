@@ -1037,9 +1037,9 @@ function Keypad({ value, onDigit, onBackspace }: { value: string; onDigit: (digi
         <HapticPressable
           key={key}
           onPress={() => (key === 'back' ? onBackspace() : onDigit(key))}
-          style={[styles.amountKey, { backgroundColor: colors.card, borderColor: colors.border }]}
+          style={styles.amountKey}
         >
-          {key === 'back' ? <Feather name="delete" size={19} color={colors.foreground} /> : <Text style={[styles.amountKeyText, { color: colors.foreground }]}>{key}</Text>}
+          {key === 'back' ? <Feather name="delete" size={21} color={colors.foreground} /> : <Text style={[styles.amountKeyText, { color: colors.foreground }]}>{key}</Text>}
         </HapticPressable>
       ))}
     </View>
@@ -1142,7 +1142,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         </View>
       </View>
       <View style={styles.amountHeader}>
-        <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>ENTER AMOUNT</Text>
+        <Text style={[styles.cardLabel, { color: colors.mutedForeground }]}>YOU PAY</Text>
         <Text style={[styles.amountDisplay, { color: number > buyerBalance ? colors.destructive : colors.foreground }]}>
           {amount ? `R${amount}` : 'R0.00'}
         </Text>
@@ -1160,11 +1160,12 @@ function PayScreen({ onBack }: { onBack: () => void }) {
         testID="generate-payment-qr"
         disabled={number <= 0 || number > buyerBalance}
         onPress={generate}
-        style={[styles.primaryButton, { backgroundColor: colors.button }]}
+        style={[styles.primaryButton, styles.payCta, { backgroundColor: colors.button }]}
       >
         <Feather name="maximize" size={18} color={colors.buttonForeground} />
         <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Show QR to seller</Text>
       </HapticPressable>
+      <Text style={[styles.payCtaHint, { color: colors.mutedForeground }]}>The seller scans your code. It works once, for 60 seconds.</Text>
       <Modal visible={qrVisible} transparent animationType="fade" onRequestClose={() => setQrVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.qrModal, { backgroundColor: colors.card }]}>
@@ -2118,11 +2119,13 @@ const styles = StyleSheet.create({
   quickAmounts: { flexDirection: 'row', justifyContent: 'center', gap: 8, marginTop: 15 },
   quickAmount: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
   quickAmountText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12 },
-  amountKeypad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 9, marginTop: 17 },
-  amountKey: { width: '30%', height: 45, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
-  amountKeyText: { fontFamily: 'Montserrat_500Medium', fontSize: 19 },
+  amountKeypad: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 22 },
+  amountKey: { width: '30%', height: 54, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
+  amountKeyText: { fontFamily: 'Montserrat_500Medium', fontSize: 24 },
   primaryButton: { minHeight: 53, borderRadius: 999, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 9 },
   primaryButtonText: { fontFamily: 'Montserrat_700Bold', fontSize: 14 },
+  payCta: { marginTop: 30 },
+  payCtaHint: { fontFamily: 'Montserrat_400Regular', fontSize: 11, textAlign: 'center', marginTop: 12, paddingHorizontal: 30, lineHeight: 16 },
   pressed: { opacity: 0.72 },
   disabled: { opacity: 0.35 },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.58)', justifyContent: 'flex-end' },

@@ -19,7 +19,7 @@ const publicDir = path.join(root, 'public');
 const assetsDir = path.join(root, 'assets', 'images');
 
 const faviconSrc = path.join(assetsDir, 'favicon.png');
-const logoSrc = path.join(assetsDir, 'mlogo.png');
+const logoSrc = path.join(assetsDir, 'icon.png');
 
 (async () => {
   fs.mkdirSync(path.join(publicDir, 'icons'), { recursive: true });
@@ -36,9 +36,10 @@ const logoSrc = path.join(assetsDir, 'mlogo.png');
     console.log(`wrote icons/${size}.png (${size}x${size})`);
   }
 
-  await sharp(logoSrc)
-    .resize(480, 480)
-    .extend({ top: 16, bottom: 16, left: 16, right: 16, background: '#00A8A8' })
+  await sharp({
+    create: { width: 512, height: 512, channels: 3, background: '#F8F1E2' },
+  })
+    .composite([{ input: await sharp(logoSrc).resize(410, 410).toBuffer(), gravity: 'center' }])
     .toFormat('png')
     .toFile(path.join(publicDir, 'icons', 'maskable-512.png'));
   console.log('wrote icons/maskable-512.png (512x512 maskable)');
