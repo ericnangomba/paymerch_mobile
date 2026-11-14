@@ -14,4 +14,5 @@ export const WalletTransactionKind = {
   VAS_ELEC: 'VAS_ELEC',
   VAS_AIRTIME: 'VAS_AIRTIME',
   CASH_OUT: 'CASH_OUT',
+  TOP_UP: 'TOP_UP',
 } as const;

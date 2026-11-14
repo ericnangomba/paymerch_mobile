@@ -46,12 +46,24 @@ export type DemoKeyValueStore = {
 export type DemoAuthTokenGetter = () => Promise<string | null> | string | null;
 
 export const DEMO_PROFILES: { buyer: Profile; trader: Profile } = {
-  buyer: { accountType: 'individual', name: 'Demo Buyer', phone: '0000000001' },
+  buyer: {
+    accountType: 'individual',
+    name: 'Demo Buyer',
+    phone: '0000000001',
+    bankName: 'TymeBank',
+    bankAccountHolder: 'Demo Buyer',
+    bankAccountNumber: '000000004242',
+    bankAccountType: 'Savings',
+  },
   trader: {
     accountType: 'business',
     name: 'Demo Trader',
     phone: '0000000002',
     businessCategory: 'Spaza shop',
+    bankName: 'Capitec',
+    bankAccountHolder: 'Demo Trader',
+    bankAccountNumber: '000000001337',
+    bankAccountType: 'Cheque',
   },
 };
 
@@ -334,6 +346,35 @@ export function createDemoApi(kv: DemoKeyValueStore, now: () => number = () => D
         });
         await save();
         return { result: 'SUCCESS', wallet: walletOf(merchant) };
+      });
+    },
+
+    topUp(req: AmountRequest): Promise<WalletState> {
+      return enqueue(async () => {
+        const d = await load();
+        const user = await currentUser(d);
+        consumeReauth(d, user, 'top-up', req.reauthToken);
+        const amountCents = Math.round(req.amount * 100);
+        if (amountCents <= 0) {
+          throw apiError(400, 'Enter an amount above zero');
+        }
+        if (user.profile.accountType === 'business') {
+          user.merchantBalanceCents += amountCents;
+        } else {
+          user.buyerBalanceCents += amountCents;
+        }
+        user.transactions.push({
+          id: randomToken(8),
+          kind: 'TOP_UP',
+          title: 'Wallet top-up',
+          subtitle: 'Test top-up · no real debit',
+          amount: amountCents / 100,
+          status: 'SUCCESS',
+          createdAt: now(),
+          direction: 'in',
+        });
+        await save();
+        return walletOf(user);
       });
     },
 

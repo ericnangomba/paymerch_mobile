@@ -6,6 +6,7 @@
 // and shows itself as disconnected.
 import {
   cashOut as clientCashOut,
+  topUp as clientTopUp,
   completePaymentRequest as clientCompletePaymentRequest,
   createPaymentRequest as clientCreatePaymentRequest,
   getPaymentRequest as clientGetPaymentRequest,
@@ -84,4 +85,8 @@ export function completePaymentRequest(
 
 export function cashOut(req: AmountRequest): Promise<WalletState> {
   return demoMode ? demoApi.cashOut(req) : clientCashOut(req);
+}
+
+export function topUp(req: AmountRequest): Promise<WalletState> {
+  return demoMode ? demoApi.topUp(req) : clientTopUp(req);
 }

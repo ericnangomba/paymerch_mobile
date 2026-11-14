@@ -13,4 +13,5 @@ export const VerifyPinRequestAction = {
   'create-payment-request': 'create-payment-request',
   'complete-payment': 'complete-payment',
   'cash-out': 'cash-out',
+  'top-up': 'top-up',
 } as const;

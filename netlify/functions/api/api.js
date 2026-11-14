@@ -59190,7 +59190,7 @@ var RegisterResponse = objectType({
     "merchantBalance": numberType(),
     "transactions": arrayType(objectType({
       "id": stringType(),
-      "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT"]),
+      "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT", "TOP_UP"]),
       "title": stringType(),
       "subtitle": stringType(),
       "amount": numberType(),
@@ -59223,7 +59223,7 @@ var LoginResponse = objectType({
     "merchantBalance": numberType(),
     "transactions": arrayType(objectType({
       "id": stringType(),
-      "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT"]),
+      "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT", "TOP_UP"]),
       "title": stringType(),
       "subtitle": stringType(),
       "amount": numberType(),
@@ -59236,7 +59236,7 @@ var LoginResponse = objectType({
 });
 var VerifyPinBody = objectType({
   "pin": stringType(),
-  "action": enumType(["create-payment-request", "complete-payment", "cash-out"])
+  "action": enumType(["create-payment-request", "complete-payment", "cash-out", "top-up"])
 });
 var VerifyPinResponse = objectType({
   "ok": booleanType(),
@@ -59250,7 +59250,7 @@ var GetWalletResponse = objectType({
   "merchantBalance": numberType(),
   "transactions": arrayType(objectType({
     "id": stringType(),
-    "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT"]),
+    "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT", "TOP_UP"]),
     "title": stringType(),
     "subtitle": stringType(),
     "amount": numberType(),
@@ -59270,7 +59270,27 @@ var CashOutResponse = objectType({
   "merchantBalance": numberType(),
   "transactions": arrayType(objectType({
     "id": stringType(),
-    "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT"]),
+    "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT", "TOP_UP"]),
+    "title": stringType(),
+    "subtitle": stringType(),
+    "amount": numberType(),
+    "status": enumType(["SUCCESS", "FAILED"]),
+    "createdAt": numberType(),
+    "direction": enumType(["in", "out"]),
+    "reference": stringType().optional()
+  }))
+});
+var topUpBodyAmountExclusiveMin = 0;
+var TopUpBody = objectType({
+  "amount": numberType().gt(topUpBodyAmountExclusiveMin),
+  "reauthToken": stringType()
+});
+var TopUpResponse = objectType({
+  "buyerBalance": numberType(),
+  "merchantBalance": numberType(),
+  "transactions": arrayType(objectType({
+    "id": stringType(),
+    "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT", "TOP_UP"]),
     "title": stringType(),
     "subtitle": stringType(),
     "amount": numberType(),
@@ -59314,7 +59334,7 @@ var CompletePaymentRequestResponse = objectType({
     "merchantBalance": numberType(),
     "transactions": arrayType(objectType({
       "id": stringType(),
-      "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT"]),
+      "kind": enumType(["MERCHANT_PAY", "VAS_ELEC", "VAS_AIRTIME", "CASH_OUT", "TOP_UP"]),
       "title": stringType(),
       "subtitle": stringType(),
       "amount": numberType(),
@@ -59515,6 +59535,20 @@ async function completePaymentRequest(db2, token, merchant) {
     throw err;
   }
 }
+async function topUp(db2, userId, amountCents, accountType) {
+  return db2.transaction(async (tx) => {
+    const credited = accountType === "business" ? await tx.update(walletsTable).set({ merchantBalanceCents: sql`${walletsTable.merchantBalanceCents} + ${amountCents}` }).where(eq(walletsTable.userId, userId)).returning() : await tx.update(walletsTable).set({ buyerBalanceCents: sql`${walletsTable.buyerBalanceCents} + ${amountCents}` }).where(eq(walletsTable.userId, userId)).returning();
+    if (credited.length === 0) return false;
+    await tx.insert(ledgerEntriesTable).values({
+      userId,
+      kind: "TOP_UP",
+      title: "Wallet top-up",
+      subtitle: "Test top-up \xB7 no real debit",
+      amountCents
+    });
+    return true;
+  });
+}
 async function cashOut(db2, userId, amountCents) {
   return db2.transaction(async (tx) => {
     const debited = await tx.update(walletsTable).set({ merchantBalanceCents: sql`${walletsTable.merchantBalanceCents} - ${amountCents}` }).where(
@@ -59679,6 +59713,36 @@ function createWalletRouter(resolveDb) {
         return;
       }
       res.json(CashOutResponse.parse(await buildWalletState(db2, currentUser(res).id)));
+    } catch (err) {
+      next(err);
+    }
+  });
+  router2.post("/wallet/top-up", requireAuth(resolveDb), async (req, res, next) => {
+    try {
+      const parsed = TopUpBody.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ message: "Invalid amount" });
+        return;
+      }
+      const body = parsed.data;
+      const amountCents = randsToCents(body.amount);
+      if (amountCents === null) {
+        res.status(400).json({ message: "Invalid amount" });
+        return;
+      }
+      const db2 = await resolveDb();
+      const user = currentUser(res);
+      const reauth = await consumeReauthToken(db2, user.id, "top-up", body.reauthToken);
+      if (!reauth) {
+        res.status(403).json({ message: "PIN confirmation required for this action" });
+        return;
+      }
+      const ok = await topUp(db2, user.id, amountCents, user.accountType);
+      if (!ok) {
+        res.status(400).json({ message: "Could not top up the test wallet" });
+        return;
+      }
+      res.json(TopUpResponse.parse(await buildWalletState(db2, currentUser(res).id)));
     } catch (err) {
       next(err);
     }

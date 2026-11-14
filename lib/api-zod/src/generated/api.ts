@@ -56,7 +56,7 @@ export const RegisterResponse = zod.object({
   "merchantBalance": zod.number(),
   "transactions": zod.array(zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT']),
+  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT', 'TOP_UP']),
   "title": zod.string(),
   "subtitle": zod.string(),
   "amount": zod.number(),
@@ -95,7 +95,7 @@ export const LoginResponse = zod.object({
   "merchantBalance": zod.number(),
   "transactions": zod.array(zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT']),
+  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT', 'TOP_UP']),
   "title": zod.string(),
   "subtitle": zod.string(),
   "amount": zod.number(),
@@ -114,7 +114,7 @@ export const LoginResponse = zod.object({
  */
 export const VerifyPinBody = zod.object({
   "pin": zod.string(),
-  "action": zod.enum(['create-payment-request', 'complete-payment', 'cash-out'])
+  "action": zod.enum(['create-payment-request', 'complete-payment', 'cash-out', 'top-up'])
 })
 
 export const VerifyPinResponse = zod.object({
@@ -139,7 +139,7 @@ export const GetWalletResponse = zod.object({
   "merchantBalance": zod.number(),
   "transactions": zod.array(zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT']),
+  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT', 'TOP_UP']),
   "title": zod.string(),
   "subtitle": zod.string(),
   "amount": zod.number(),
@@ -169,7 +169,37 @@ export const CashOutResponse = zod.object({
   "merchantBalance": zod.number(),
   "transactions": zod.array(zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT']),
+  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT', 'TOP_UP']),
+  "title": zod.string(),
+  "subtitle": zod.string(),
+  "amount": zod.number(),
+  "status": zod.enum(['SUCCESS', 'FAILED']),
+  "createdAt": zod.number(),
+  "direction": zod.enum(['in', 'out']),
+  "reference": zod.string().optional()
+}))
+})
+
+
+/**
+ * Credits the account's test wallet (merchant wallet for business accounts, buyer wallet for individuals) and records a ledger entry. No real money moves.
+ * @summary Test wallet top-up (no real debit)
+ */
+export const topUpBodyAmountExclusiveMin = 0;
+
+
+
+export const TopUpBody = zod.object({
+  "amount": zod.number().gt(topUpBodyAmountExclusiveMin),
+  "reauthToken": zod.string()
+})
+
+export const TopUpResponse = zod.object({
+  "buyerBalance": zod.number(),
+  "merchantBalance": zod.number(),
+  "transactions": zod.array(zod.object({
+  "id": zod.string(),
+  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT', 'TOP_UP']),
   "title": zod.string(),
   "subtitle": zod.string(),
   "amount": zod.number(),
@@ -236,7 +266,7 @@ export const CompletePaymentRequestResponse = zod.object({
   "merchantBalance": zod.number(),
   "transactions": zod.array(zod.object({
   "id": zod.string(),
-  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT']),
+  "kind": zod.enum(['MERCHANT_PAY', 'VAS_ELEC', 'VAS_AIRTIME', 'CASH_OUT', 'TOP_UP']),
   "title": zod.string(),
   "subtitle": zod.string(),
   "amount": zod.number(),

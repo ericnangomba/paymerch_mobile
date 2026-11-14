@@ -183,6 +183,43 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorMessage"
+  /wallet/top-up:
+    post:
+      operationId: topUp
+      tags: [wallet]
+      summary: Test wallet top-up (no real debit)
+      description: Credits the account's test wallet (merchant wallet for business accounts, buyer wallet for individuals) and records a ledger entry. No real money moves.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+                $ref: "#/components/schemas/AmountRequest"
+      responses:
+        "200":
+          description: Updated wallet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WalletState"
+        "400":
+          description: Invalid amount
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
+        "403":
+          description: Valid action-bound reauth token required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorMessage"
   /payment-requests:
     post:
       operationId: createPaymentRequest
@@ -356,7 +393,7 @@ components:
           type: string
         action:
           type: string
-          enum: [create-payment-request, complete-payment, cash-out]
+          enum: [create-payment-request, complete-payment, cash-out, top-up]
       required:
         - pin
         - action
@@ -389,7 +426,7 @@ components:
           type: string
         kind:
           type: string
-          enum: [MERCHANT_PAY, VAS_ELEC, VAS_AIRTIME, CASH_OUT]
+          enum: [MERCHANT_PAY, VAS_ELEC, VAS_AIRTIME, CASH_OUT, TOP_UP]
         title:
           type: string
         subtitle:

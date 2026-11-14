@@ -3,11 +3,14 @@ import {
   CashOutBody,
   CashOutResponse,
   GetWalletResponse,
+  TopUpBody,
+  TopUpResponse,
 } from "@workspace/api-zod";
 import type { LedgerEntry, Wallet } from "@workspace/db/schema";
 import {
   consumeReauthToken,
   cashOut,
+  topUp,
   getWalletRow,
   listRecentEntries,
   randsToCents,
@@ -31,7 +34,7 @@ export type Profile = {
 
 export type WalletTransaction = {
   id: string;
-  kind: "MERCHANT_PAY" | "VAS_ELEC" | "VAS_AIRTIME" | "CASH_OUT";
+  kind: "MERCHANT_PAY" | "VAS_ELEC" | "VAS_AIRTIME" | "CASH_OUT" | "TOP_UP";
   title: string;
   subtitle: string;
   amount: number;
@@ -126,6 +129,37 @@ export function createWalletRouter(resolveDb: DbResolver): Router {
         return;
       }
       res.json(CashOutResponse.parse(await buildWalletState(db, currentUser(res).id)));
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.post("/wallet/top-up", requireAuth(resolveDb), async (req, res, next) => {
+    try {
+      const parsed = TopUpBody.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json({ message: "Invalid amount" });
+        return;
+      }
+      const body = parsed.data;
+      const amountCents = randsToCents(body.amount);
+      if (amountCents === null) {
+        res.status(400).json({ message: "Invalid amount" });
+        return;
+      }
+      const db = await resolveDb();
+      const user = currentUser(res);
+      const reauth = await consumeReauthToken(db, user.id, "top-up", body.reauthToken);
+      if (!reauth) {
+        res.status(403).json({ message: "PIN confirmation required for this action" });
+        return;
+      }
+      const ok = await topUp(db, user.id, amountCents, user.accountType);
+      if (!ok) {
+        res.status(400).json({ message: "Could not top up the test wallet" });
+        return;
+      }
+      res.json(TopUpResponse.parse(await buildWalletState(db, currentUser(res).id)));
     } catch (err) {
       next(err);
     }

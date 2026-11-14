@@ -128,7 +128,7 @@ export async function deleteSession(q: Q, token: string): Promise<void> {
   await q.delete(sessionsTable).where(eq(sessionsTable.tokenHash, hashToken(token)));
 }
 
-export type ReauthAction = "create-payment-request" | "complete-payment" | "cash-out";
+export type ReauthAction = "create-payment-request" | "complete-payment" | "cash-out" | "top-up";
 
 export async function createReauthToken(q: Q, userId: string, action: ReauthAction): Promise<string> {
   const token = randomBytes(32).toString("base64url");
@@ -303,6 +303,40 @@ export async function completePaymentRequest(
     if (err instanceof InsufficientBalanceError) return "INSUFFICIENT_BALANCE";
     throw err;
   }
+}
+
+// Test-money top-up: credits the account's test wallet (merchant wallet for
+// business accounts, buyer wallet for individuals) and records it. No real
+// debit happens in the pilot.
+export async function topUp(
+  db: Db,
+  userId: string,
+  amountCents: number,
+  accountType: string,
+): Promise<boolean> {
+  return db.transaction(async (tx) => {
+    const credited =
+      accountType === "business"
+        ? await tx
+            .update(walletsTable)
+            .set({ merchantBalanceCents: sql`${walletsTable.merchantBalanceCents} + ${amountCents}` })
+            .where(eq(walletsTable.userId, userId))
+            .returning()
+        : await tx
+            .update(walletsTable)
+            .set({ buyerBalanceCents: sql`${walletsTable.buyerBalanceCents} + ${amountCents}` })
+            .where(eq(walletsTable.userId, userId))
+            .returning();
+    if (credited.length === 0) return false;
+    await tx.insert(ledgerEntriesTable).values({
+      userId,
+      kind: "TOP_UP",
+      title: "Wallet top-up",
+      subtitle: "Test top-up · no real debit",
+      amountCents,
+    });
+    return true;
+  });
 }
 
 // Test-money cash-out: debits the merchant test balance and records it. No

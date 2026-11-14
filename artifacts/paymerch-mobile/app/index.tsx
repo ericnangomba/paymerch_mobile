@@ -57,6 +57,28 @@ const airtimeProviders = [
 
 const eskomProvider = { id: 'eskom', name: 'Eskom', logo: '/vas-logos/eskom.png' } as const;
 
+// South African banks offered as demo payout destinations / top-up sources.
+// Logos are bundled under public/bank-logos with sources in ATTRIBUTION.md;
+// no bank partnership or integration is implied.
+const saBanks = [
+  { id: 'capitec', name: 'Capitec', logo: '/bank-logos/capitec.png' },
+  { id: 'fnb', name: 'FNB', logo: '/bank-logos/fnb.png' },
+  { id: 'standardbank', name: 'Standard Bank', logo: '/bank-logos/standardbank.png' },
+  { id: 'absa', name: 'Absa', logo: '/bank-logos/absa.png' },
+  { id: 'nedbank', name: 'Nedbank', logo: '/bank-logos/nedbank.png' },
+  { id: 'tymebank', name: 'TymeBank', logo: '/bank-logos/tymebank.png' },
+] as const;
+
+type SaBank = (typeof saBanks)[number];
+
+const findBank = (name?: string): SaBank | undefined => saBanks.find((bank) => bank.name === name);
+
+const maskAccount = (num?: string): string => {
+  if (!num) return 'Account on file';
+  const digits = num.replace(/\D/g, '');
+  return digits.length >= 4 ? `\u2022\u2022 ${digits.slice(-4)}` : 'Account on file';
+};
+
 const businessCategoryIcons: Record<BusinessCategory, IconName> = {
   'Spaza shop': 'shopping-bag',
   'Street vendor': 'map-pin',
@@ -610,6 +632,10 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [category, setCategory] = useState<BusinessCategory>('Spaza shop');
+  const [bankId, setBankId] = useState<string | null>(null);
+  const [bankAccountHolder, setBankAccountHolder] = useState('');
+  const [bankAccountNumber, setBankAccountNumber] = useState('');
+  const [bankAccountType, setBankAccountType] = useState<'Cheque' | 'Savings'>('Cheque');
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [showPin, setShowPin] = useState(false);
@@ -625,6 +651,16 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
       setError('Enter a valid mobile number.');
       return;
     }
+    const selectedBank = saBanks.find((bank) => bank.id === bankId);
+    if (!selectedBank) {
+      setError('Choose your bank. This is where cash-outs would be paid in production.');
+      return;
+    }
+    const trimmedAccountNumber = bankAccountNumber.replace(/\D/g, '');
+    if (trimmedAccountNumber && (trimmedAccountNumber.length < 6 || trimmedAccountNumber.length > 16)) {
+      setError('A bank account number is 6 to 16 digits. Use a made-up one for this demo.');
+      return;
+    }
     if (!/^\d{6}$/.test(pin)) {
       setError('Your PIN must be exactly 6 digits.');
       return;
@@ -638,6 +674,10 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
       name: name.trim(),
       phone: phone.trim(),
       ...(accountType === 'business' ? { businessCategory: category } : {}),
+      bankName: selectedBank.name,
+      bankAccountHolder: bankAccountHolder.trim() || name.trim(),
+      ...(trimmedAccountNumber ? { bankAccountNumber: trimmedAccountNumber } : {}),
+      bankAccountType,
     };
     const ok = await registerAccount(profile, pin);
     if (!ok) {
@@ -766,6 +806,62 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
           />
         </View>
       </View>
+      <View style={styles.registrationFieldGroup}>
+        <Text style={[styles.registrationFieldLabel, { color: colors.foreground }]}>YOUR BANK</Text>
+        <Text style={[styles.registrationSectionHint, { color: colors.mutedForeground, marginBottom: 12 }]}>
+          {accountType === 'business' ? 'Where your cash-outs would be paid in production.' : 'Where your top-ups would come from in production.'}
+        </Text>
+        <BankPicker selectedId={bankId} onSelect={(bank) => { setBankId(bank.id); setError(''); }} />
+      </View>
+      {bankId ? (
+        <View style={styles.registrationFieldGroup}>
+          <Text style={[styles.registrationFieldLabel, { color: colors.foreground }]}>ACCOUNT DETAILS (DEMO)</Text>
+          <View style={[styles.registrationInputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="user" size={18} color={colors.mutedForeground} />
+            <TextInput
+              value={bankAccountHolder}
+              onChangeText={(value) => { setBankAccountHolder(value); setError(''); }}
+              placeholder="Account holder (defaults to your name)"
+              placeholderTextColor={colors.mutedForeground}
+              autoCapitalize="words"
+              style={[styles.registrationInput, { color: colors.foreground }]}
+              returnKeyType="next"
+            />
+          </View>
+          <View style={[styles.registrationInputShell, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}>
+            <Feather name="hash" size={18} color={colors.mutedForeground} />
+            <TextInput
+              value={bankAccountNumber}
+              onChangeText={(value) => { setBankAccountNumber(value.replace(/\D/g, '').slice(0, 16)); setError(''); }}
+              placeholder="Account number (made-up, optional)"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="number-pad"
+              style={[styles.registrationInput, { color: colors.foreground }]}
+              returnKeyType="next"
+            />
+          </View>
+          <View style={styles.registrationBankTypeRow}>
+            {(['Cheque', 'Savings'] as const).map((type) => {
+              const selected = bankAccountType === type;
+              return (
+                <HapticPressable
+                  key={type}
+                  onPress={() => setBankAccountType(type)}
+                  style={[styles.registrationBankTypeChip, { backgroundColor: selected ? colors.active : colors.muted, borderColor: selected ? colors.active : colors.border }]}
+                >
+                  <Text style={[styles.registrationBankTypeText, { color: selected ? colors.activeForeground : colors.foreground }]}>{type}</Text>
+                </HapticPressable>
+              );
+            })}
+          </View>
+          <View style={[styles.registrationBankNote, { backgroundColor: colors.warm }]}>
+            <Feather name="info" size={14} color={colors.warning} />
+            <Text style={[styles.registrationBankNoteText, { color: colors.foreground }]}>
+              Pilot demo: no real payouts or debits happen. Use a made-up account number, not your real banking details.
+            </Text>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.registrationPinSection}>
         <View style={styles.registrationPinHeading}>
           <View>
@@ -815,7 +911,7 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
       <View style={[styles.registrationNoteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Feather name="info" size={16} color={colors.mutedForeground} />
         <Text style={[styles.registrationNote, { color: colors.mutedForeground }]}>
-          Pilot notice: your account and PIN are secured on the pilot server. No bank details are collected, and no real money moves.
+          Pilot notice: your account, PIN and bank preference are stored on the pilot server. All balances are test money: cash-outs and top-ups are simulated, and no real money moves.
         </Text>
       </View>
       <HapticPressable onPress={() => void enterDemoMode()} style={styles.biometricButton} testID="enter-demo">
@@ -904,7 +1000,9 @@ function ActivityRow({ transaction, colors }: { transaction: Transaction; colors
         ? 'phone'
         : transaction.kind === 'CASH_OUT'
           ? 'download'
-          : 'arrow-down-left';
+          : transaction.kind === 'TOP_UP'
+            ? 'plus-circle'
+            : 'arrow-down-left';
   const tint = transaction.status === 'PENDING SYNC' ? colors.warning : transaction.direction === 'in' ? colors.success : colors.foreground;
   return (
     <View style={styles.activityRow}>
@@ -941,12 +1039,70 @@ function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; 
   );
 }
 
+function BankPicker({ selectedId, onSelect }: { selectedId: string | null; onSelect: (bank: SaBank) => void }) {
+  const colors = useColors();
+  return (
+    <View style={styles.providerGrid}>
+      {saBanks.map((bank) => {
+        const selected = selectedId === bank.id;
+        return (
+          <HapticPressable key={bank.id} onPress={() => onSelect(bank)} style={[styles.providerTile, { backgroundColor: selected ? colors.accent : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
+            <View style={[styles.providerCheck, styles.providerTileCheck, selected ? { backgroundColor: colors.primary } : { borderWidth: 1, borderColor: colors.border }]}>
+              {selected ? <Feather name="check" size={11} color={colors.primaryForeground} /> : null}
+            </View>
+            <View style={styles.providerTileLogoFrame}>
+              <Image source={{ uri: bank.logo }} style={styles.providerTileLogo} resizeMode="contain" />
+            </View>
+            <Text style={[styles.providerTileName, { color: colors.foreground }]}>{bank.name}</Text>
+          </HapticPressable>
+        );
+      })}
+    </View>
+  );
+}
+
+function BankCard({
+  bank,
+  accountNumber,
+  accountType,
+  label,
+  onChange,
+}: {
+  bank?: SaBank;
+  accountNumber?: string;
+  accountType?: string;
+  label: string;
+  onChange?: () => void;
+}) {
+  const colors = useColors();
+  if (!bank) return null;
+  return (
+    <View style={[styles.bankCard, { backgroundColor: colors.muted, borderColor: colors.border }]}>
+      <View style={[styles.bankCardLogoFrame, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <Image source={{ uri: bank.logo }} style={styles.bankCardLogo} resizeMode="contain" />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.bankCardLabel, { color: colors.mutedForeground }]}>{label}</Text>
+        <Text style={[styles.bankCardName, { color: colors.foreground }]}>{bank.name}</Text>
+        <Text style={[styles.bankCardMeta, { color: colors.mutedForeground }]}>{[accountType, maskAccount(accountNumber)].filter(Boolean).join(' · ')}</Text>
+      </View>
+      {onChange ? (
+        <HapticPressable onPress={onChange} style={styles.bankCardChange}>
+          <Text style={[styles.bankCardChangeText, { color: colors.primary }]}>Change</Text>
+        </HapticPressable>
+      ) : null}
+    </View>
+  );
+}
+
 function HomeScreen({
   onNavigate,
   onOpenCashOut,
+  onOpenTopUp,
 }: {
   onNavigate: (screen: Screen) => void;
   onOpenCashOut: () => void;
+  onOpenTopUp: () => void;
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -1007,10 +1163,14 @@ function HomeScreen({
           <>
             <QuickAction icon="zap" label="Sell VAS" onPress={() => onNavigate('vas')} />
             <QuickAction icon="credit-card" label="Customer pays" onPress={() => onNavigate('pay')} />
+            <QuickAction icon="plus-circle" label="Top up" onPress={onOpenTopUp} />
             <QuickAction icon="download" label="Cash out" onPress={onOpenCashOut} />
           </>
         ) : (
-          <QuickAction icon="credit-card" label="Pay a trader" onPress={() => onNavigate('pay')} />
+          <>
+            <QuickAction icon="credit-card" label="Pay a trader" onPress={() => onNavigate('pay')} />
+            <QuickAction icon="plus-circle" label="Top up" onPress={onOpenTopUp} />
+          </>
         )}
       </View>
       <View style={styles.sectionHeader}>
@@ -1705,6 +1865,17 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
           <Text style={styles.settingsPhone}>{profile.phone}</Text>
         </View>
       </View>
+      {profile.bankName ? (
+        <>
+          <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>BANK</Text>
+          <BankCard
+            bank={findBank(profile.bankName)}
+            accountNumber={profile.bankAccountNumber}
+            accountType={profile.bankAccountType}
+            label={profile.accountType === 'business' ? 'CASH-OUT DESTINATION (DEMO)' : 'TOP-UP SOURCE (DEMO)'}
+          />
+        </>
+      ) : null}
       {demoMode ? (
         <>
           <Text style={[styles.formLabel, { color: colors.mutedForeground }]}>DEMO MODE</Text>
@@ -1788,7 +1959,7 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
       </View>
       <View style={[styles.settingsNote, { backgroundColor: colors.muted }]}>
         <Feather name="info" size={16} color={colors.mutedForeground} />
-        <Text style={[styles.settingsNoteText, { color: colors.mutedForeground }]}>This pilot stores accounts and test balances on the pilot server. No bank details are collected; cash-outs are simulated ledger entries, not bank payouts.</Text>
+        <Text style={[styles.settingsNoteText, { color: colors.mutedForeground }]}>This pilot stores accounts, bank preferences and test balances on the pilot server. Cash-outs and top-ups are simulated ledger entries, not real bank payouts or debits.</Text>
       </View>
       <HapticPressable onPress={() => void logout()} style={[styles.logoutButton, { borderColor: colors.border }]}>
         <Feather name="log-out" size={17} color={colors.destructive} />
@@ -1830,11 +2001,19 @@ export default function PaymerchHome() {
   const [cashOutAmount, setCashOutAmount] = useState('100');
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [cashOutError, setCashOutError] = useState('');
+  const [topUpVisible, setTopUpVisible] = useState(false);
+  const [topUpAmount, setTopUpAmount] = useState('100');
+  const [topUpPinModalVisible, setTopUpPinModalVisible] = useState(false);
+  const [topUpError, setTopUpError] = useState('');
+  const [cashOutBankId, setCashOutBankId] = useState<string | null>(null);
+  const [cashOutBankPicker, setCashOutBankPicker] = useState(false);
+  const [topUpBankId, setTopUpBankId] = useState<string | null>(null);
+  const [topUpBankPicker, setTopUpBankPicker] = useState(false);
   const [splashAcknowledged, setSplashAcknowledged] = useState(false);
   const [preferredAccountType, setPreferredAccountType] = useState<AccountType | null>(null);
   const [installPrompt, setInstallPrompt] = useState<DeferredInstallPrompt | null>(null);
   const colors = useColors();
-  const { cashOut, merchantBalance, profile, enterDemoMode } = useWallet();
+  const { cashOut, topUp, merchantBalance, buyerBalance, profile, enterDemoMode } = useWallet();
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -1871,6 +2050,17 @@ export default function PaymerchHome() {
     }
   };
 
+  const handleTopUpPinConfirm = async (enteredPin: string) => {
+    if (await topUp(Number(topUpAmount), enteredPin)) {
+      setTopUpVisible(false);
+      setTopUpPinModalVisible(false);
+      setTopUpError('');
+    } else {
+      setTopUpError('Invalid PIN. Please try again.');
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    }
+  };
+
   if (!splashAcknowledged || !ready) {
     return (
       <AppSplashScreen
@@ -1899,7 +2089,7 @@ export default function PaymerchHome() {
     if (screen === 'vas') return <VasScreen onBack={() => navigate('home')} />;
     if (screen === 'activity') return <ActivityScreen onBack={() => navigate('home')} />;
     if (screen === 'settings') return <SettingsScreen onBack={() => navigate('home')} />;
-    return <HomeScreen onNavigate={navigate} onOpenCashOut={() => setCashOutVisible(true)} />;
+    return <HomeScreen onNavigate={navigate} onOpenCashOut={() => setCashOutVisible(true)} onOpenTopUp={() => setTopUpVisible(true)} />;
   };
 
   const mainContent = (
@@ -1909,31 +2099,51 @@ export default function PaymerchHome() {
       <Modal visible={cashOutVisible} transparent animationType="slide" onRequestClose={() => setCashOutVisible(false)}>
         <View style={styles.modalBackdrop}>
           <View style={[styles.cashOutModal, { backgroundColor: colors.card }]}>
-            <View style={styles.qrModalHeader}>
-              <View>
-                <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>BUSINESS WALLET · {zar(merchantBalance)}</Text>
-                <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>Cash out</Text>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false} keyboardShouldPersistTaps="handled">
+              <View style={styles.qrModalHeader}>
+                <View>
+                  <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>BUSINESS WALLET · {zar(merchantBalance)}</Text>
+                  <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>Cash out</Text>
+                </View>
+                <HapticPressable onPress={() => setCashOutVisible(false)} style={styles.closeButton}><Feather name="x" size={20} color={colors.foreground} /></HapticPressable>
               </View>
-              <HapticPressable onPress={() => setCashOutVisible(false)} style={styles.closeButton}><Feather name="x" size={20} color={colors.foreground} /></HapticPressable>
-            </View>
-            <Text style={[styles.formLabel, { color: colors.foreground }]}>AMOUNT</Text>
-            <TextInput value={cashOutAmount} onChangeText={setCashOutAmount} keyboardType="decimal-pad" style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
-            <View style={[styles.cashOutBankNote, { backgroundColor: colors.warm }]}>
-              <Feather name="info" size={15} color={colors.warning} />
-              <Text style={[styles.cashOutBankNoteText, { color: colors.foreground }]}>
-                Test cash-out only: it updates the business wallet balance on the pilot server. No bank details are collected and no real payout happens.
-              </Text>
-            </View>
-            <HapticPressable
-              onPress={() => {
-                setPinModalVisible(true);
-              }}
-              disabled={Number(cashOutAmount) <= 0 || Number(cashOutAmount) > merchantBalance}
-              style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 18 }]}
-            >
-              <Feather name="download" size={18} color={colors.buttonForeground} />
-              <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Confirm cash out</Text>
-            </HapticPressable>
+              <Text style={[styles.formLabel, { color: colors.foreground }]}>PAYOUT TO</Text>
+              {(() => {
+                const destination = cashOutBankId ? saBanks.find((bank) => bank.id === cashOutBankId) : findBank(profile.bankName);
+                return destination ? (
+                  <BankCard
+                    bank={destination}
+                    accountNumber={cashOutBankId ? undefined : profile.bankAccountNumber}
+                    accountType={cashOutBankId ? undefined : profile.bankAccountType}
+                    label={cashOutBankId ? 'DEMO DESTINATION' : 'YOUR BANK (DEMO)'}
+                    onChange={() => setCashOutBankPicker((open) => !open)}
+                  />
+                ) : null;
+              })()}
+              {cashOutBankPicker || (!profile.bankName && !cashOutBankId) ? (
+                <View style={{ marginTop: cashOutBankPicker ? 10 : 0 }}>
+                  <BankPicker selectedId={cashOutBankId} onSelect={(bank) => { setCashOutBankId(bank.id); setCashOutBankPicker(false); }} />
+                </View>
+              ) : null}
+              <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 16 }]}>AMOUNT</Text>
+              <TextInput value={cashOutAmount} onChangeText={setCashOutAmount} keyboardType="decimal-pad" style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground }]} />
+              <View style={[styles.cashOutBankNote, { backgroundColor: colors.warm }]}>
+                <Feather name="info" size={15} color={colors.warning} />
+                <Text style={[styles.cashOutBankNoteText, { color: colors.foreground }]}>
+                  Test cash-out only: it updates the business wallet balance on the pilot server. The bank shown is where a payout would go in production - no real payout happens.
+                </Text>
+              </View>
+              <HapticPressable
+                onPress={() => {
+                  setPinModalVisible(true);
+                }}
+                disabled={Number(cashOutAmount) <= 0 || Number(cashOutAmount) > merchantBalance || (!profile.bankName && !cashOutBankId)}
+                style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 18 }]}
+              >
+                <Feather name="download" size={18} color={colors.buttonForeground} />
+                <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Confirm cash out</Text>
+              </HapticPressable>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1945,6 +2155,73 @@ export default function PaymerchHome() {
         summary={`Cash out ${zar(Number(cashOutAmount) || 0)} from your business wallet (test only)`}
         error={cashOutError}
         onClearError={() => setCashOutError('')}
+      />
+      <Modal visible={topUpVisible} transparent animationType="slide" onRequestClose={() => setTopUpVisible(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.cashOutModal, { backgroundColor: colors.card }]}>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false} keyboardShouldPersistTaps="handled">
+              <View style={styles.qrModalHeader}>
+                <View>
+                  <Text style={[styles.pageEyebrow, { color: colors.mutedForeground }]}>{profile.accountType === 'business' ? 'BUSINESS WALLET' : 'PERSONAL WALLET'} · {zar(profile.accountType === 'business' ? merchantBalance : buyerBalance)}</Text>
+                  <Text style={[styles.qrModalTitle, { color: colors.foreground }]}>Top up wallet</Text>
+                </View>
+                <HapticPressable onPress={() => setTopUpVisible(false)} style={styles.closeButton}><Feather name="x" size={20} color={colors.foreground} /></HapticPressable>
+              </View>
+              <Text style={[styles.formLabel, { color: colors.foreground }]}>FROM</Text>
+              {(() => {
+                const source = topUpBankId ? saBanks.find((bank) => bank.id === topUpBankId) : findBank(profile.bankName);
+                return source ? (
+                  <BankCard
+                    bank={source}
+                    accountNumber={topUpBankId ? undefined : profile.bankAccountNumber}
+                    accountType={topUpBankId ? undefined : profile.bankAccountType}
+                    label={topUpBankId ? 'DEMO SOURCE' : 'YOUR BANK (DEMO)'}
+                    onChange={() => setTopUpBankPicker((open) => !open)}
+                  />
+                ) : null;
+              })()}
+              {topUpBankPicker || (!profile.bankName && !topUpBankId) ? (
+                <View style={{ marginTop: topUpBankPicker ? 10 : 0 }}>
+                  <BankPicker selectedId={topUpBankId} onSelect={(bank) => { setTopUpBankId(bank.id); setTopUpBankPicker(false); }} />
+                </View>
+              ) : null}
+              <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 16 }]}>AMOUNT</Text>
+              <View style={styles.vasOptions}>
+                {[50, 100, 200, 500].map((option) => (
+                  <HapticPressable key={option} onPress={() => setTopUpAmount(String(option))} style={[styles.vasOption, { backgroundColor: Number(topUpAmount) === option ? colors.foreground : colors.card, borderColor: Number(topUpAmount) === option ? colors.foreground : colors.border }]}>
+                    <Text style={[styles.vasOptionText, { color: Number(topUpAmount) === option ? '#F8F1E2' : colors.foreground }]}>R{option}</Text>
+                  </HapticPressable>
+                ))}
+              </View>
+              <TextInput value={topUpAmount} onChangeText={setTopUpAmount} keyboardType="decimal-pad" placeholder="Custom amount" placeholderTextColor={colors.mutedForeground} style={[styles.textInput, { backgroundColor: colors.card, borderColor: colors.border, color: colors.foreground, marginTop: 12 }]} />
+              <View style={[styles.cashOutBankNote, { backgroundColor: colors.warm }]}>
+                <Feather name="info" size={15} color={colors.warning} />
+                <Text style={[styles.cashOutBankNoteText, { color: colors.foreground }]}>
+                  Test top-up only: it adds test money to your pilot wallet. The bank shown is where a debit would come from in production - no real money moves.
+                </Text>
+              </View>
+              <HapticPressable
+                onPress={() => {
+                  setTopUpPinModalVisible(true);
+                }}
+                disabled={Number(topUpAmount) <= 0 || Number(topUpAmount) > 50000 || (!profile.bankName && !topUpBankId)}
+                style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 18 }]}
+              >
+                <Feather name="plus-circle" size={18} color={colors.buttonForeground} />
+                <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Confirm top up</Text>
+              </HapticPressable>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+      <PinConfirmationModal
+        visible={topUpPinModalVisible}
+        onConfirm={handleTopUpPinConfirm}
+        onCancel={() => setTopUpPinModalVisible(false)}
+        title="Confirm Top Up"
+        summary={`Top up ${zar(Number(topUpAmount) || 0)} into your ${profile.accountType === 'business' ? 'business' : 'personal'} wallet (test only)`}
+        error={topUpError}
+        onClearError={() => setTopUpError('')}
       />
     </View>
   );
@@ -2237,7 +2514,20 @@ const styles = StyleSheet.create({
   navItem: { alignItems: 'center', justifyContent: 'center', gap: 4, minWidth: 58 },
   navIcon: { width: 44, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
   navLabel: { fontFamily: 'Montserrat_600SemiBold', fontSize: 10 },
-  cashOutModal: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, minHeight: 280 },
+  cashOutModal: { borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 22, minHeight: 280, maxHeight: '92%' },
+  bankCard: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 17, borderWidth: 1, padding: 12 },
+  bankCardLogoFrame: { width: 52, height: 52, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  bankCardLogo: { width: 42, height: 42 },
+  bankCardLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 8.5, letterSpacing: 1.1 },
+  bankCardName: { fontFamily: 'Montserrat_700Bold', fontSize: 14.5, marginTop: 2 },
+  bankCardMeta: { fontFamily: 'Montserrat_400Regular', fontSize: 11, marginTop: 2 },
+  bankCardChange: { paddingHorizontal: 6, paddingVertical: 4 },
+  bankCardChangeText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 12.5 },
+  registrationBankTypeRow: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  registrationBankTypeChip: { flex: 1, borderRadius: 999, borderWidth: 1, alignItems: 'center', paddingVertical: 10 },
+  registrationBankTypeText: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13 },
+  registrationBankNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 8, borderRadius: 13, padding: 11, marginTop: 12 },
+  registrationBankNoteText: { flex: 1, fontFamily: 'Montserrat_400Regular', fontSize: 11, lineHeight: 16 },
   settingsProfile: { borderRadius: 20, padding: 18, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 28 },
   profileInitials: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' },
   profileInitialText: { fontFamily: 'Montserrat_700Bold', color: '#0A0A0A', fontSize: 16 },

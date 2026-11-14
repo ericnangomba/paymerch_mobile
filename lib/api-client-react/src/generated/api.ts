@@ -647,6 +647,95 @@ export const useCashOut = <TError = ErrorType<ErrorMessage>,
       return useMutation(getCashOutMutationOptions(options));
     }
 
+export const getTopUpUrl = () => {
+
+
+
+
+  return `/api/wallet/top-up`
+}
+
+/**
+ * Credits the account's test wallet (merchant wallet for business accounts, buyer wallet for individuals) and records a ledger entry. No real money moves.
+ * @summary Test wallet top-up (no real debit)
+ */
+export const topUp = async (amountRequest: AmountRequest, options?: Parameters<typeof customFetch>[1]): Promise<WalletState> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return customFetch<WalletState>(getTopUpUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(amountRequest)
+  }
+);}
+
+
+
+
+
+export const getTopUpMutationKey = () => ['topUp'] as const;
+
+export const getTopUpMutationOptions = <TError = ErrorType<ErrorMessage>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof topUp>>, TError,TopUpMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof topUp>>, TError,TopUpMutationVariables, TContext> => {
+
+const mutationKey = getTopUpMutationKey();
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof topUp>>, TopUpMutationVariables> = (props) => {
+          const {data} = props ?? {};
+
+          return  topUp(data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TopUpMutationResult = NonNullable<Awaited<ReturnType<typeof topUp>>>
+    export type TopUpMutationBody = BodyType<AmountRequest>
+    export type TopUpMutationError = ErrorType<ErrorMessage>
+    export type TopUpMutationVariables = {data: BodyType<AmountRequest>}
+
+    /**
+ * @summary Test wallet top-up (no real debit)
+ */
+export const useTopUp = <TError = ErrorType<ErrorMessage>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof topUp>>, TError,TopUpMutationVariables, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof topUp>>,
+        TError,
+        TopUpMutationVariables,
+        TContext
+      > => {
+      return useMutation(getTopUpMutationOptions(options));
+    }
+
 export const getCreatePaymentRequestUrl = () => {
 
 

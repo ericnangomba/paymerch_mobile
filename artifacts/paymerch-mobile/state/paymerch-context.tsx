@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import {
   cashOut as apiCashOut,
+  topUp as apiTopUp,
   completePaymentRequest as apiCompletePaymentRequest,
   createPaymentRequest as apiCreatePaymentRequest,
   getPaymentRequest as apiGetPaymentRequest,
@@ -20,7 +21,7 @@ import { demoApi, DEMO_PIN } from '../lib/demo-api';
 import type { Profile as ApiProfile, WalletState } from '@workspace/api-client-react';
 
 export type TransactionStatus = 'SUCCESS' | 'PENDING SYNC' | 'FAILED';
-export type TransactionKind = 'MERCHANT_PAY' | 'VAS_ELEC' | 'VAS_AIRTIME' | 'CASH_OUT';
+export type TransactionKind = 'MERCHANT_PAY' | 'VAS_ELEC' | 'VAS_AIRTIME' | 'CASH_OUT' | 'TOP_UP';
 export type BusinessCategory =
   | 'Spaza shop'
   | 'Street vendor'
@@ -31,13 +32,20 @@ export type BusinessCategory =
   | 'Mini bus taxi';
 export type AccountType = 'individual' | 'business';
 
-// The pilot never collects bank details: balances are test money on the
-// pilot server and cash-out is a simulated ledger entry, not a bank payout.
+// Balances are test money on the pilot server: cash-out is a simulated
+// ledger entry, not a bank payout, and top-ups are simulated test credits,
+// not real debits. Bank details captured at registration describe where a
+// payout WOULD go in production; the pilot pays nothing out.
 export type UserProfile = {
   accountType: AccountType;
   name: string;
   phone: string;
   businessCategory?: BusinessCategory;
+  bankName?: string;
+  bankAccountHolder?: string;
+  bankAccountNumber?: string;
+  bankAccountType?: string;
+  bankBranchCode?: string;
 };
 
 export type Transaction = {
@@ -69,7 +77,7 @@ export type PaymentRequestPreview = {
   status: 'OPEN' | 'COMPLETED' | 'EXPIRED';
 };
 
-export type ReauthAction = 'create-payment-request' | 'complete-payment' | 'cash-out';
+export type ReauthAction = 'create-payment-request' | 'complete-payment' | 'cash-out' | 'top-up';
 
 export type CompletePaymentResult =
   | 'SUCCESS'
@@ -108,6 +116,7 @@ type WalletContextValue = {
   ) => Promise<CompletePaymentResult>;
   vendVas: (kind: 'VAS_ELEC' | 'VAS_AIRTIME', amount: number, destination: string) => string | null;
   cashOut: (amount: number, pin: string) => Promise<boolean>;
+  topUp: (amount: number, pin: string) => Promise<boolean>;
   setBusinessCategory: (category: BusinessCategory) => void;
   demoMode: boolean;
   demoPin: string;
@@ -589,6 +598,27 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [online, requestReauth, merchantBalance, cacheWallet],
   );
 
+  // Test-money top-up: credits the active wallet on the pilot server (or the
+  // demo store in demo mode). No real debit happens.
+  const topUp = useCallback(
+    async (amount: number, pin: string): Promise<boolean> => {
+      if (!online) return false;
+      const safeAmount = Math.round(amount * 100) / 100;
+      if (safeAmount <= 0) return false;
+      const reauthToken = await requestReauth(pin, 'top-up');
+      if (!reauthToken) return false;
+      try {
+        const wallet = await apiTopUp({ amount: safeAmount, reauthToken });
+        applyWalletState(wallet, { setBuyerBalance, setMerchantBalance, setTransactions });
+        await cacheWallet(wallet);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    [online, requestReauth, cacheWallet],
+  );
+
   const updateBusinessCategory = useCallback((category: BusinessCategory) => {
     setBusinessCategory(category);
     setProfile((current) =>
@@ -624,6 +654,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       completePayment,
       vendVas,
       cashOut,
+      topUp,
       setBusinessCategory: updateBusinessCategory,
       demoMode,
       demoPin: DEMO_PIN,
@@ -656,6 +687,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       completePayment,
       vendVas,
       cashOut,
+      topUp,
       updateBusinessCategory,
       demoMode,
       enterDemoMode,

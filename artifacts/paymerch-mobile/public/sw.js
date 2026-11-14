@@ -6,7 +6,7 @@
  * be installed. Navigation requests are served from the cache first and refreshed
  * in the background so users always get the latest build once online.
  */
-const CACHE_NAME = 'paymerch-mobile-v6';
+const CACHE_NAME = 'paymerch-mobile-v7';
 
 const APP_SHELL_URLS = [
   '/',
@@ -47,6 +47,8 @@ self.addEventListener('fetch', (event) => {
     url.pathname.startsWith('/_expo/static/') ||
     url.pathname.startsWith('/assets/') ||
     url.pathname.startsWith('/icons/') ||
+    url.pathname.startsWith('/vas-logos/') ||
+    url.pathname.startsWith('/bank-logos/') ||
     url.pathname.startsWith('/favicon') ||
     url.pathname.startsWith('/apple-touch-icon');
 
