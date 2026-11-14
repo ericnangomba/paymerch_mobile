@@ -1959,7 +1959,9 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
       </View>
       <View style={[styles.settingsNote, { backgroundColor: colors.muted }]}>
         <Feather name="info" size={16} color={colors.mutedForeground} />
-        <Text style={[styles.settingsNoteText, { color: colors.mutedForeground }]}>This pilot stores accounts, bank preferences and test balances on the pilot server. Cash-outs and top-ups are simulated ledger entries, not real bank payouts or debits.</Text>
+        <Text style={[styles.settingsNoteText, { color: colors.mutedForeground }]}>{demoMode
+          ? 'Demo mode stores this profile, bank preference and test balances on this device only. Cash-outs and top-ups are simulated in the local demo, not real bank payouts or debits.'
+          : 'This pilot stores accounts, bank preferences and test balances on the pilot server. Cash-outs and top-ups are simulated ledger entries, not real bank payouts or debits.'}</Text>
       </View>
       <HapticPressable onPress={() => void logout()} style={[styles.logoutButton, { borderColor: colors.border }]}>
         <Feather name="log-out" size={17} color={colors.destructive} />
@@ -2013,7 +2015,7 @@ export default function PaymerchHome() {
   const [preferredAccountType, setPreferredAccountType] = useState<AccountType | null>(null);
   const [installPrompt, setInstallPrompt] = useState<DeferredInstallPrompt | null>(null);
   const colors = useColors();
-  const { cashOut, topUp, merchantBalance, buyerBalance, profile, enterDemoMode } = useWallet();
+  const { cashOut, topUp, merchantBalance, buyerBalance, profile, enterDemoMode, demoMode } = useWallet();
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -2130,7 +2132,9 @@ export default function PaymerchHome() {
               <View style={[styles.cashOutBankNote, { backgroundColor: colors.warm }]}>
                 <Feather name="info" size={15} color={colors.warning} />
                 <Text style={[styles.cashOutBankNoteText, { color: colors.foreground }]}>
-                  Test cash-out only: it updates the business wallet balance on the pilot server. The bank shown is where a payout would go in production - no real payout happens.
+                  {demoMode
+                    ? 'Test cash-out only: it updates the business wallet balance in the local demo on this device. The bank shown is where a payout would go in production - no real payout happens.'
+                    : 'Test cash-out only: it updates the business wallet balance on the pilot server. The bank shown is where a payout would go in production - no real payout happens.'}
                 </Text>
               </View>
               <HapticPressable
@@ -2197,7 +2201,9 @@ export default function PaymerchHome() {
               <View style={[styles.cashOutBankNote, { backgroundColor: colors.warm }]}>
                 <Feather name="info" size={15} color={colors.warning} />
                 <Text style={[styles.cashOutBankNoteText, { color: colors.foreground }]}>
-                  Test top-up only: it adds test money to your pilot wallet. The bank shown is where a debit would come from in production - no real money moves.
+                  {demoMode
+                    ? 'Test top-up only: it adds test money to your demo wallet on this device. The bank shown is where a debit would come from in production - no real money moves.'
+                    : 'Test top-up only: it adds test money to your pilot wallet on the pilot server. The bank shown is where a debit would come from in production - no real money moves.'}
                 </Text>
               </View>
               <HapticPressable

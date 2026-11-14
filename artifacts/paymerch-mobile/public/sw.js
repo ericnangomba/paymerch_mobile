@@ -6,7 +6,7 @@
  * be installed. Navigation requests are served from the cache first and refreshed
  * in the background so users always get the latest build once online.
  */
-const CACHE_NAME = 'paymerch-mobile-v8';
+const CACHE_NAME = 'paymerch-mobile-v9';
 
 const APP_SHELL_URLS = [
   '/',
