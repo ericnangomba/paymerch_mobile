@@ -1574,7 +1574,7 @@ function VasScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: 42 }]}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 112 }]}>
       <View style={styles.pageHeader}>
         <HapticPressable onPress={onBack} style={styles.backButton}>
           <Feather name="arrow-left" size={21} color={colors.foreground} />
