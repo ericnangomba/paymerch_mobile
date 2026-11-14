@@ -47,6 +47,16 @@ const businessCategories: BusinessCategory[] = [
   'Mini bus taxi',
 ];
 
+const airtimeProviders = [
+  { id: 'mtn', name: 'MTN', logo: '/vas-logos/mtn.png' },
+  { id: 'vodacom', name: 'Vodacom', logo: '/vas-logos/vodacom.png' },
+  { id: 'telkom', name: 'Telkom', logo: '/vas-logos/telkom.png' },
+  { id: 'cellc', name: 'Cell C', logo: '/vas-logos/cellc.png' },
+  { id: 'rain', name: 'rain', logo: '/vas-logos/rain.png' },
+] as const;
+
+const eskomProvider = { id: 'eskom', name: 'Eskom', logo: '/vas-logos/eskom.png' } as const;
+
 const businessCategoryIcons: Record<BusinessCategory, IconName> = {
   'Spaza shop': 'shopping-bag',
   'Street vendor': 'map-pin',
@@ -1482,12 +1492,16 @@ function VasScreen({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
   const { buyerBalance, vendVas } = useWallet();
   const [kind, setKind] = useState<'VAS_ELEC' | 'VAS_AIRTIME'>('VAS_ELEC');
+  const [providerId, setProviderId] = useState<string>('eskom');
   const [destination, setDestination] = useState('');
   const [amount, setAmount] = useState(50);
   const [token, setToken] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const options = kind === 'VAS_ELEC' ? [20, 50, 100, 200] : [10, 20, 50, 100];
+  const provider = kind === 'VAS_ELEC'
+    ? eskomProvider
+    : airtimeProviders.find((item) => item.id === providerId) ?? airtimeProviders[0];
 
   const vend = () => {
     if (kind === 'VAS_ELEC') {
@@ -1543,12 +1557,12 @@ function VasScreen({ onBack }: { onBack: () => void }) {
           {kind === 'VAS_ELEC' ? (
             <View style={[styles.tokenBox, { backgroundColor: colors.muted }]}>
               <Text style={[styles.tokenValue, { color: colors.foreground }]}>{token.match(/.{1,4}/g)?.join(' ')}</Text>
-              <Text style={[styles.tokenCaption, { color: colors.mutedForeground }]}>STS ELECTRICITY TOKEN · R{amount}</Text>
+              <Text style={[styles.tokenCaption, { color: colors.mutedForeground }]}>ESKOM · STS TOKEN · R{amount}</Text>
             </View>
           ) : (
             <View style={[styles.tokenBox, { backgroundColor: colors.muted }]}>
               <Text style={[styles.tokenValue, { color: colors.foreground }]}>R{amount}.00</Text>
-              <Text style={[styles.tokenCaption, { color: colors.mutedForeground }]}>AIRTIME VALUE</Text>
+              <Text style={[styles.tokenCaption, { color: colors.mutedForeground }]}>{provider.name.toUpperCase()} AIRTIME</Text>
             </View>
           )}
           <HapticPressable onPress={() => setToken(null)} style={[styles.primaryButton, { backgroundColor: colors.button }]}>
@@ -1571,17 +1585,37 @@ function VasScreen({ onBack }: { onBack: () => void }) {
         </View>
         <View style={{ width: 42 }} />
       </View>
-      <View style={[styles.segmented, { backgroundColor: colors.muted }]}>
-        <HapticPressable onPress={() => { setKind('VAS_ELEC'); setError(''); }} style={[styles.segment, kind === 'VAS_ELEC' && { backgroundColor: colors.card }]}>
-          <Feather name="zap" size={16} color={kind === 'VAS_ELEC' ? colors.foreground : colors.mutedForeground} />
-          <Text style={[styles.segmentText, { color: kind === 'VAS_ELEC' ? colors.foreground : colors.mutedForeground }]}>Electricity</Text>
-        </HapticPressable>
-        <HapticPressable onPress={() => { setKind('VAS_AIRTIME'); setError(''); }} style={[styles.segment, kind === 'VAS_AIRTIME' && { backgroundColor: colors.card }]}>
-          <Feather name="phone" size={16} color={kind === 'VAS_AIRTIME' ? colors.foreground : colors.mutedForeground} />
-          <Text style={[styles.segmentText, { color: kind === 'VAS_AIRTIME' ? colors.foreground : colors.mutedForeground }]}>Airtime</Text>
-        </HapticPressable>
+      <Text style={[styles.formLabel, { color: colors.foreground }]}>Electricity</Text>
+      <HapticPressable onPress={() => { setKind('VAS_ELEC'); setProviderId('eskom'); setError(''); }} style={[styles.providerWide, { backgroundColor: kind === 'VAS_ELEC' ? colors.accent : colors.card, borderColor: kind === 'VAS_ELEC' ? colors.primary : colors.border }]}>
+        <View style={styles.providerLogoFrame}>
+          <Image source={{ uri: eskomProvider.logo }} style={styles.providerLogo} resizeMode="contain" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.providerName, { color: colors.foreground }]}>Eskom prepaid</Text>
+          <Text style={[styles.providerHint, { color: colors.mutedForeground }]}>STS electricity token</Text>
+        </View>
+        <View style={[styles.providerCheck, kind === 'VAS_ELEC' ? { backgroundColor: colors.primary } : { borderWidth: 1, borderColor: colors.border }]}>
+          {kind === 'VAS_ELEC' ? <Feather name="check" size={13} color={colors.primaryForeground} /> : null}
+        </View>
+      </HapticPressable>
+      <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 22 }]}>Airtime & data</Text>
+      <View style={styles.providerGrid}>
+        {airtimeProviders.map((item) => {
+          const selected = kind === 'VAS_AIRTIME' && providerId === item.id;
+          return (
+            <HapticPressable key={item.id} onPress={() => { setKind('VAS_AIRTIME'); setProviderId(item.id); setError(''); }} style={[styles.providerTile, { backgroundColor: selected ? colors.accent : colors.card, borderColor: selected ? colors.primary : colors.border }]}>
+              <View style={[styles.providerCheck, styles.providerTileCheck, selected ? { backgroundColor: colors.primary } : { borderWidth: 1, borderColor: colors.border }]}>
+                {selected ? <Feather name="check" size={11} color={colors.primaryForeground} /> : null}
+              </View>
+              <View style={styles.providerTileLogoFrame}>
+                <Image source={{ uri: item.logo }} style={styles.providerTileLogo} resizeMode="contain" />
+              </View>
+              <Text style={[styles.providerTileName, { color: colors.foreground }]}>{item.name}</Text>
+            </HapticPressable>
+          );
+        })}
       </View>
-      <Text style={[styles.formLabel, { color: colors.foreground }]}>{kind === 'VAS_ELEC' ? 'Meter number' : 'Phone number'}</Text>
+      <Text style={[styles.formLabel, { color: colors.foreground, marginTop: 22 }]}>{kind === 'VAS_ELEC' ? 'Meter number' : `${provider.name} phone number`}</Text>
       <TextInput
         value={destination}
         onChangeText={(value) => { setDestination(value); setError(''); }}
@@ -1603,12 +1637,12 @@ function VasScreen({ onBack }: { onBack: () => void }) {
       </View>
       {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
       <HapticPressable disabled style={[styles.primaryButton, { backgroundColor: colors.button, marginTop: 28, opacity: 0.5 }]}>
-        <Feather name="zap" size={18} color={colors.buttonForeground} />
-        <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>Generate {kind === 'VAS_ELEC' ? 'electricity token' : 'airtime'}</Text>
+        <Feather name={kind === 'VAS_ELEC' ? 'zap' : 'phone'} size={18} color={colors.buttonForeground} />
+        <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>{kind === 'VAS_ELEC' ? 'Generate electricity token' : `Send ${provider.name} airtime`}</Text>
       </HapticPressable>
       <View style={[styles.infoBanner, { backgroundColor: colors.accent }]}>
         <Feather name="info" size={16} color={colors.accentForeground} />
-        <Text style={[styles.infoText, { color: colors.accentForeground }]}>VAS vending is not part of this pilot build yet. Airtime and electricity return in a later stage.</Text>
+        <Text style={[styles.infoText, { color: colors.accentForeground }]}>Demo preview: VAS vending is not part of this pilot build yet, and no provider accounts are connected. Airtime and electricity return in a later stage.</Text>
       </View>
       <PinConfirmationModal
         visible={pinModalVisible}
@@ -2174,6 +2208,18 @@ const styles = StyleSheet.create({
   formLabel: { fontFamily: 'Montserrat_700Bold', fontSize: 10, letterSpacing: 1.2, marginBottom: 9, textAlign: 'center' },
   textInput: { borderWidth: 1, borderRadius: 15, minHeight: 53, paddingHorizontal: 15, fontFamily: 'Montserrat_400Regular', fontSize: 14 },
   vasAmountHeader: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
+  providerWide: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 22, borderWidth: 1.5, padding: 12 },
+  providerLogoFrame: { width: 56, height: 56, borderRadius: 16, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  providerLogo: { width: 44, height: 44 },
+  providerName: { fontFamily: 'Montserrat_700Bold', fontSize: 15 },
+  providerHint: { fontFamily: 'Montserrat_400Regular', fontSize: 12, marginTop: 2 },
+  providerCheck: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
+  providerGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  providerTile: { width: '31%', flexGrow: 1, borderRadius: 20, borderWidth: 1.5, alignItems: 'center', paddingVertical: 12, paddingHorizontal: 8 },
+  providerTileCheck: { position: 'absolute', top: 8, right: 8 },
+  providerTileLogoFrame: { width: 52, height: 52, borderRadius: 14, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  providerTileLogo: { width: 42, height: 42 },
+  providerTileName: { fontFamily: 'Montserrat_700Bold', fontSize: 12, marginTop: 8 },
   balanceHint: { fontFamily: 'Montserrat_400Regular', fontSize: 12 },
   vasOptions: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   vasOption: { width: '48%', minHeight: 54, borderRadius: 999, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
