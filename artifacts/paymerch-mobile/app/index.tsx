@@ -1478,7 +1478,7 @@ function PayScreen({ onBack }: { onBack: () => void }) {
 function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (screen: Screen) => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { completePayment, previewPaymentRequest, online, demoMode } = useWallet();
+  const { completePayment, previewPaymentRequest, verifyReceipt, online, demoMode } = useWallet();
 
   const [permissionResponse, requestPermission] = useCameraPermissions();
   const [asked, setAsked] = useState(false);
@@ -1510,6 +1510,19 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
     setScanError('');
     setCameraError(false);
   };
+
+  // Test-only scaffolding: ?scantest=<token> injects a scanned payload so the
+  // accept/recovery journey can be exercised without a camera. Inert for
+  // anyone who does not pass the parameter; the token goes through the exact
+  // same server verification and PIN confirmation as a camera scan.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const fixtureToken = new URLSearchParams(window.location.search).get('scantest');
+    if (!fixtureToken || fixtureToken.length > 128) return;
+    setScanned(true);
+    void processPayload({ token: fixtureToken, amount: 0, expiresAt: Date.now() + 60_000, name: 'Test fixture' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const processPayload = async (payload: QrPayload) => {
     if (payload.expiresAt <= Date.now()) {
@@ -1570,6 +1583,24 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       setPinError('');
     } else if (outcome === 'INVALID_AUTH') {
       setPinError('Invalid PIN. Please try again.');
+    } else if (outcome === 'ALREADY_USED') {
+      // ALREADY_USED proves the token was claimed, not that THIS wallet was
+      // paid - our own earlier attempt may have settled, or another merchant
+      // may have claimed it. Only our own ledger entry is receipt proof.
+      setPinModalVisible(false);
+      setPinError('');
+      const receipt = await verifyReceipt(scannedPayload.token);
+      if (receipt === 'RECEIVED') {
+        setResult('success');
+      } else if (receipt === 'NOT_RECEIVED') {
+        setScannedPayload(null);
+        setScanned(false);
+        setFailureMessage('This payment was already completed, but not into your wallet. Ask the customer to check their activity to see who they paid.');
+        setResult('failed');
+      } else {
+        setUnknownMessage('');
+        setResult('unknown');
+      }
     } else if (outcome === 'UNKNOWN') {
       // The settlement answer was lost: the payment may or may not have
       // landed. Keep the scanned request and let the merchant check the
@@ -1583,7 +1614,6 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         INVALID_REQUEST: 'This QR payment request is invalid.',
         EXPIRED: 'This QR has expired. Ask the customer to create a new one.',
         INSUFFICIENT_BALANCE: 'The customer does not have enough test money for this payment.',
-        ALREADY_USED: 'This payment has already been completed. Check Recent activity.',
       } as const;
       setPinModalVisible(false);
       setPinError('');
@@ -1643,8 +1673,19 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       return;
     }
     if (statusPreview.status === 'COMPLETED') {
-      setPreview(statusPreview);
-      setResult('success');
+      // COMPLETED means claimed by someone; confirm it landed in THIS wallet.
+      const receipt = await verifyReceipt(scannedPayload.token);
+      if (receipt === 'RECEIVED') {
+        setPreview(statusPreview);
+        setResult('success');
+      } else if (receipt === 'NOT_RECEIVED') {
+        setScannedPayload(null);
+        setScanned(false);
+        setFailureMessage('This payment was already completed, but not into your wallet. Ask the customer to check their activity to see who they paid.');
+        setResult('failed');
+      } else {
+        setUnknownMessage('Still cannot reach the pilot server. Check Recent activity before taking this payment again.');
+      }
       return;
     }
     if (statusPreview.status === 'OPEN') {

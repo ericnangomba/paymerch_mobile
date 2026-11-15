@@ -118,6 +118,11 @@ type WalletContextValue = {
   syncPending: () => void;
   createPaymentRequest: (amount: number, pin: string) => Promise<PaymentRequest | null>;
   previewPaymentRequest: (token: string) => Promise<PaymentRequestPreview | null>;
+  // Receipt proof: a token's status being COMPLETED only means SOME merchant
+  // claimed it. Only this wallet's own ledger entry proves THIS merchant was
+  // paid, so receipt checks read the authenticated wallet and match the
+  // request token against its transaction references.
+  verifyReceipt: (token: string) => Promise<'RECEIVED' | 'NOT_RECEIVED' | 'UNREACHABLE'>;
   completePayment: (
     request: PaymentRequest,
     payerName: string,
@@ -623,6 +628,18 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [requestReauth, online, cacheWallet],
   );
 
+  const verifyReceipt = useCallback(async (token: string): Promise<'RECEIVED' | 'NOT_RECEIVED' | 'UNREACHABLE'> => {
+    try {
+      const wallet = await apiGetWallet();
+      applyWalletState(wallet, { setBuyerBalance, setMerchantBalance, setTransactions });
+      await cacheWallet(wallet);
+      const received = (wallet.transactions ?? []).some((tx) => tx.reference === token && tx.amount > 0);
+      return received ? 'RECEIVED' : 'NOT_RECEIVED';
+    } catch {
+      return 'UNREACHABLE';
+    }
+  }, [cacheWallet]);
+
   // VAS vending is not part of the pilot build; the screen is disabled in the UI.
   const vendVas = useCallback(
     (_kind: 'VAS_ELEC' | 'VAS_AIRTIME', _amount: number, _destination: string): string | null => null,
@@ -702,6 +719,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       syncPending,
       createPaymentRequest,
       previewPaymentRequest,
+      verifyReceipt,
       completePayment,
       vendVas,
       cashOut,
@@ -736,6 +754,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       syncPending,
       createPaymentRequest,
       previewPaymentRequest,
+      verifyReceipt,
       completePayment,
       vendVas,
       cashOut,
