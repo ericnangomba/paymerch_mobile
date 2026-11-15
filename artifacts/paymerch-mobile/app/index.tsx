@@ -1,6 +1,5 @@
 import { Feather } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -94,6 +93,17 @@ const businessCategoryIcons: Record<BusinessCategory, IconName> = {
 const logo = require('../assets/images/paymerchlogo.png');
 const logoMark = require('../assets/images/mlogo.png');
 
+const formatSyncedAt = (ts: number): string => {
+  const minutes = Math.max(0, Math.round((Date.now() - ts) / 60000));
+  if (minutes < 1) return 'just now';
+  if (minutes === 1) return '1 minute ago';
+  if (minutes < 60) return `${minutes} minutes ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours === 1) return '1 hour ago';
+  if (hours < 24) return `${hours} hours ago`;
+  return new Date(ts).toLocaleString();
+};
+
 const zar = (amount: number) =>
   `R${amount.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -183,7 +193,6 @@ function HapticPressable({
       disabled={disabled}
       onPress={() => {
         if (disabled) return;
-        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         onPress?.();
       }}
       style={({ pressed }) => [style, pressed && styles.pressed, disabled && styles.disabled]}
@@ -384,11 +393,13 @@ function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType |
     setError('');
     setRegistrationMessage('');
     if (next.length === 6) {
-      const valid = await login(next);
-      if (!valid) {
+      const outcome = await login(next);
+      if (outcome === 'OFFLINE') {
+        setError('No connection right now. Check your signal and try again.');
+        setPin('');
+      } else if (outcome !== 'OK') {
         setError('That PIN did not match. Please try again.');
         setPin('');
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
     }
   };
@@ -1106,7 +1117,7 @@ function HomeScreen({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buyerBalance, merchantBalance, online, toggleOnline, transactions, profile } = useWallet();
+  const { buyerBalance, merchantBalance, online, toggleOnline, transactions, profile, lastSyncedAt } = useWallet();
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
@@ -1189,7 +1200,11 @@ function HomeScreen({
           <Feather name="wifi-off" size={17} color={colors.warning} />
           <View style={styles.offlineCopy}>
             <Text style={[styles.offlineTitle, { color: colors.foreground }]}>You’re offline</Text>
-            <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>Balances shown may be out of date. Payments are unavailable until you reconnect.</Text>
+            <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>
+              {lastSyncedAt
+                ? `Balances last synced ${formatSyncedAt(lastSyncedAt)} and may be out of date. Payments are unavailable until you reconnect.`
+                : 'Balances shown may be out of date. Payments are unavailable until you reconnect.'}
+            </Text>
           </View>
         </View>
       ) : null}
@@ -1276,7 +1291,6 @@ function PayScreen({ onBack }: { onBack: () => void }) {
       setPinError('');
     } else {
       setPinError('Could not create the payment request. Check your PIN and connection.');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -1472,10 +1486,8 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       setResult('success');
       setPinModalVisible(false);
       setPinError('');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else if (outcome === 'INVALID_AUTH') {
       setPinError('Invalid PIN. Please try again.');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } else {
       const messages = {
         INVALID_REQUEST: 'This QR payment request is invalid.',
@@ -1489,7 +1501,6 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       setScanned(false);
       setFailureMessage(messages[outcome]);
       setResult('failed');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -1844,8 +1855,7 @@ function ActivityScreen({ onBack }: { onBack: () => void }) {
 function SettingsScreen({ onBack }: { onBack: () => void }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory, profile, demoMode, switchDemoProfile, exitDemoMode } = useWallet();
-  const pending = transactions.filter((transaction) => transaction.status === 'PENDING SYNC').length;
+  const { online, toggleOnline, syncPending, transactions, logout, businessCategory, setBusinessCategory, profile, demoMode, switchDemoProfile, exitDemoMode, lastSyncedAt } = useWallet();
   return (
     <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + 18, paddingBottom: insets.bottom + 30 }]}>
       <View style={styles.pageHeader}>
@@ -1932,17 +1942,23 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
             <Feather name={online ? 'wifi' : 'wifi-off'} size={17} color={online ? colors.accentForeground : colors.warning} />
           </View>
           <View style={styles.settingCopy}>
-            <Text style={[styles.settingTitle, { color: colors.foreground }]}>{online ? 'Connected' : 'Offline mode'}</Text>
-            <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>{online ? 'Transactions sync instantly' : `${pending} item${pending === 1 ? '' : 's'} waiting to sync`}</Text>
+            <Text style={[styles.settingTitle, { color: colors.foreground }]}>{online ? 'Connected' : 'Offline'}</Text>
+            <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>
+              {online
+                ? `Balances synced${lastSyncedAt ? ` ${formatSyncedAt(lastSyncedAt)}` : ''}`
+                : lastSyncedAt
+                  ? `Last synced ${formatSyncedAt(lastSyncedAt)} · payments unavailable`
+                  : 'Balances may be out of date · payments unavailable'}
+            </Text>
           </View>
           <HapticPressable onPress={toggleOnline} style={[styles.toggle, { backgroundColor: online ? colors.success : colors.border }]}>
             <View style={[styles.toggleThumb, { backgroundColor: colors.card, alignSelf: online ? 'flex-end' : 'flex-start' }]} />
           </HapticPressable>
         </View>
-        {!online && pending > 0 ? (
-          <HapticPressable onPress={() => { toggleOnline(); syncPending(); }} style={[styles.syncButton, { backgroundColor: colors.muted }]}>
+        {!online ? (
+          <HapticPressable onPress={() => { if (!online) toggleOnline(); syncPending(); }} style={[styles.syncButton, { backgroundColor: colors.muted }]}>
             <Feather name="refresh-cw" size={15} color={colors.foreground} />
-            <Text style={[styles.syncButtonText, { color: colors.foreground }]}>Reconnect & sync now</Text>
+            <Text style={[styles.syncButtonText, { color: colors.foreground }]}>Retry connection now</Text>
           </HapticPressable>
         ) : null}
       </View>
@@ -2048,7 +2064,6 @@ export default function PaymerchHome() {
       setCashOutError('');
     } else {
       setCashOutError('Invalid PIN. Please try again.');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 
@@ -2059,7 +2074,6 @@ export default function PaymerchHome() {
       setTopUpError('');
     } else {
       setTopUpError('Invalid PIN. Please try again.');
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
   };
 

@@ -87,6 +87,10 @@ export type CompletePaymentResult =
   | 'INSUFFICIENT_BALANCE'
   | 'ALREADY_USED';
 
+// Distinguishes a wrong PIN from an unreachable server so the login screen
+// can say which one happened instead of blaming the PIN for a network drop.
+export type LoginOutcome = 'OK' | 'WRONG_PIN' | 'OFFLINE';
+
 type WalletContextValue = {
   ready: boolean;
   signedIn: boolean;
@@ -100,7 +104,8 @@ type WalletContextValue = {
   profile: UserProfile;
   biometricAvailable: boolean;
   biometricLabel: string;
-  login: (pin: string) => Promise<boolean>;
+  lastSyncedAt: number | null;
+  login: (pin: string) => Promise<LoginOutcome>;
   biometricLogin: () => Promise<void>;
   verifyBiometrics: () => Promise<boolean>;
   registerAccount: (profile: UserProfile, pin: string) => Promise<boolean>;
@@ -133,11 +138,13 @@ const WALLET_CACHE_KEY = 'paymerch-wallet-cache-v2';
 const DEMO_SESSION_KEY = 'paymerch-demo-session-v1';
 const DEMO_PROFILE_KEY = 'paymerch-demo-profile-v1';
 const DEMO_WALLET_CACHE_KEY = 'paymerch-demo-wallet-cache-v1';
+const SYNCED_AT_KEY = 'paymerch-wallet-synced-at-v1';
+const DEMO_SYNCED_AT_KEY = 'paymerch-demo-wallet-synced-at-v1';
 
-function storageKeys(demo: boolean): { session: string; profile: string; wallet: string } {
+function storageKeys(demo: boolean): { session: string; profile: string; wallet: string; syncedAt: string } {
   return demo
-    ? { session: DEMO_SESSION_KEY, profile: DEMO_PROFILE_KEY, wallet: DEMO_WALLET_CACHE_KEY }
-    : { session: SESSION_KEY, profile: PROFILE_KEY, wallet: WALLET_CACHE_KEY };
+    ? { session: DEMO_SESSION_KEY, profile: DEMO_PROFILE_KEY, wallet: DEMO_WALLET_CACHE_KEY, syncedAt: DEMO_SYNCED_AT_KEY }
+    : { session: SESSION_KEY, profile: PROFILE_KEY, wallet: WALLET_CACHE_KEY, syncedAt: SYNCED_AT_KEY };
 }
 
 // The pilot API base URL. Set EXPO_PUBLIC_API_URL at build time (for example
@@ -170,6 +177,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [merchantBalance, setMerchantBalance] = useState(0);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [online, setOnline] = useState(true);
+  const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
   const [paymentRequest, setPaymentRequest] = useState<PaymentRequest | null>(null);
   const [businessCategory, setBusinessCategory] = useState<BusinessCategory>('Spaza shop');
   const [profile, setProfile] = useState<UserProfile>({
@@ -224,6 +232,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const cacheWallet = useCallback(
     async (wallet: WalletState) => {
       await AsyncStorage.setItem(storageKeys(demoMode).wallet, JSON.stringify(wallet));
+      const syncedAt = Date.now();
+      setLastSyncedAt(syncedAt);
+      await AsyncStorage.setItem(storageKeys(demoMode).syncedAt, String(syncedAt));
     },
     [demoMode],
   );
@@ -277,18 +288,23 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     const hydrate = async () => {
-      const [token, profileRaw, walletRaw, demoToken, demoProfileRaw, demoWalletRaw] = await Promise.all([
+      const [token, profileRaw, walletRaw, demoToken, demoProfileRaw, demoWalletRaw, syncedAtRaw, demoSyncedAtRaw] = await Promise.all([
         AsyncStorage.getItem(SESSION_KEY),
         AsyncStorage.getItem(PROFILE_KEY),
         AsyncStorage.getItem(WALLET_CACHE_KEY),
         AsyncStorage.getItem(DEMO_SESSION_KEY),
         AsyncStorage.getItem(DEMO_PROFILE_KEY),
         AsyncStorage.getItem(DEMO_WALLET_CACHE_KEY),
+        AsyncStorage.getItem(SYNCED_AT_KEY),
+        AsyncStorage.getItem(DEMO_SYNCED_AT_KEY),
       ]);
       if (cancelled) return;
       // A live server session always wins; demo mode only resumes when no
       // server session exists, and is otherwise left dormant and untouched.
       const resumeDemo = !token && !!demoToken;
+      const syncedRaw = resumeDemo ? demoSyncedAtRaw : syncedAtRaw;
+      const syncedParsed = Number(syncedRaw);
+      if (syncedRaw && Number.isFinite(syncedParsed) && syncedParsed > 0) setLastSyncedAt(syncedParsed);
       if (resumeDemo) {
         setApiDemoMode(true);
         setDemoMode(true);
@@ -346,15 +362,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [refresh]);
 
   const login = useCallback(
-    async (pin: string): Promise<boolean> => {
+    async (pin: string): Promise<LoginOutcome> => {
       const phone = profile.phone;
-      if (!phone) return false;
+      if (!phone) return 'WRONG_PIN';
       try {
         const session = await apiLogin({ phone, pin });
         await acceptSession(session);
-        return true;
-      } catch {
-        return false;
+        return 'OK';
+      } catch (err: unknown) {
+        // ApiError carries an HTTP status; a network drop has none. Only a
+        // server-side rejection should blame the PIN.
+        const status = (err as { status?: number })?.status;
+        if (status === 401 || status === 429) return 'WRONG_PIN';
+        setOnline(false);
+        return 'OFFLINE';
       }
     },
     [profile.phone, acceptSession],
@@ -642,6 +663,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       profile,
       biometricAvailable,
       biometricLabel,
+      lastSyncedAt,
       login,
       biometricLogin,
       verifyBiometrics,
@@ -675,6 +697,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       profile,
       biometricAvailable,
       biometricLabel,
+      lastSyncedAt,
       login,
       biometricLogin,
       verifyBiometrics,
