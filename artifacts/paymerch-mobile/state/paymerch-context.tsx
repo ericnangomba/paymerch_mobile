@@ -122,7 +122,7 @@ type WalletContextValue = {
   // claimed it. Only this wallet's own ledger entry proves THIS merchant was
   // paid, so receipt checks read the authenticated wallet and match the
   // request token against its transaction references.
-  verifyReceipt: (token: string) => Promise<'RECEIVED' | 'NOT_RECEIVED' | 'UNREACHABLE'>;
+  verifyReceipt: (token: string, expectedAmount: number) => Promise<'RECEIVED' | 'NOT_RECEIVED' | 'UNREACHABLE'>;
   completePayment: (
     request: PaymentRequest,
     payerName: string,
@@ -628,12 +628,19 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     [requestReauth, online, cacheWallet],
   );
 
-  const verifyReceipt = useCallback(async (token: string): Promise<'RECEIVED' | 'NOT_RECEIVED' | 'UNREACHABLE'> => {
+  const verifyReceipt = useCallback(async (token: string, expectedAmount: number): Promise<'RECEIVED' | 'NOT_RECEIVED' | 'UNREACHABLE'> => {
     try {
+      // Always a fresh authoritative fetch, never the local cache. The wallet
+      // endpoint returns the newest 50 ledger entries; a settlement from this
+      // scan (seconds old) would be among them if it existed, so absence is
+      // conclusive here. Binding requires the token reference AND the exact
+      // amount, so a different payment can never pass as this one.
       const wallet = await apiGetWallet();
       applyWalletState(wallet, { setBuyerBalance, setMerchantBalance, setTransactions });
       await cacheWallet(wallet);
-      const received = (wallet.transactions ?? []).some((tx) => tx.reference === token && tx.amount > 0);
+      const received = (wallet.transactions ?? []).some(
+        (tx) => tx.reference === token && tx.amount === expectedAmount,
+      );
       return received ? 'RECEIVED' : 'NOT_RECEIVED';
     } catch {
       return 'UNREACHABLE';

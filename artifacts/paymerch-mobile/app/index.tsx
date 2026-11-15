@@ -1482,7 +1482,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 
   const [permissionResponse, requestPermission] = useCameraPermissions();
   const [asked, setAsked] = useState(false);
-  const [result, setResult] = useState<'idle' | 'success' | 'failed' | 'unknown'>('idle');
+  const [result, setResult] = useState<'idle' | 'success' | 'failed' | 'unknown' | 'unconfirmed'>('idle');
   const [failureMessage, setFailureMessage] = useState('');
   const [checkingStatus, setCheckingStatus] = useState(false);
   const [unknownMessage, setUnknownMessage] = useState('');
@@ -1589,14 +1589,11 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       // may have claimed it. Only our own ledger entry is receipt proof.
       setPinModalVisible(false);
       setPinError('');
-      const receipt = await verifyReceipt(scannedPayload.token);
+      const receipt = await verifyReceipt(scannedPayload.token, preview?.amount ?? 0);
       if (receipt === 'RECEIVED') {
         setResult('success');
       } else if (receipt === 'NOT_RECEIVED') {
-        setScannedPayload(null);
-        setScanned(false);
-        setFailureMessage('This payment was already completed, but not into your wallet. Ask the customer to check their activity to see who they paid.');
-        setResult('failed');
+        setResult('unconfirmed');
       } else {
         setUnknownMessage('');
         setResult('unknown');
@@ -1674,15 +1671,12 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
     }
     if (statusPreview.status === 'COMPLETED') {
       // COMPLETED means claimed by someone; confirm it landed in THIS wallet.
-      const receipt = await verifyReceipt(scannedPayload.token);
+      const receipt = await verifyReceipt(scannedPayload.token, statusPreview.amount);
       if (receipt === 'RECEIVED') {
         setPreview(statusPreview);
         setResult('success');
       } else if (receipt === 'NOT_RECEIVED') {
-        setScannedPayload(null);
-        setScanned(false);
-        setFailureMessage('This payment was already completed, but not into your wallet. Ask the customer to check their activity to see who they paid.');
-        setResult('failed');
+        setResult('unconfirmed');
       } else {
         setUnknownMessage('Still cannot reach the pilot server. Check Recent activity before taking this payment again.');
       }
@@ -1724,6 +1718,35 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
         </HapticPressable>
         <HapticPressable onPress={() => onNavigate('home')} style={styles.textButton}>
           <Text style={[styles.textButtonLabel, { color: colors.foreground }]}>View recent activity</Text>
+        </HapticPressable>
+        <HapticPressable
+          onPress={() => {
+            setResult('idle');
+            resetScan();
+          }}
+          style={styles.textButton}
+        >
+          <Text style={[styles.textButtonLabel, { color: colors.mutedForeground }]}>Back to scanner</Text>
+        </HapticPressable>
+      </View>
+    );
+  }
+
+  // The server says the token was claimed but this wallet shows no matching
+  // receipt. Reconcile - never suggest taking the payment again.
+  if (result === 'unconfirmed') {
+    return (
+      <View style={[styles.successRoot, { backgroundColor: colors.background, paddingTop: insets.top + 18 }]}>
+        <View style={[styles.successMark, { backgroundColor: colors.warm }]}>
+          <Feather name="search" size={34} color={colors.warning} />
+        </View>
+        <Text style={[styles.successKicker, { color: colors.mutedForeground }]}>NEEDS A MANUAL CHECK</Text>
+        <Text style={[styles.successTitle, { color: colors.foreground }]}>Not confirmed in your wallet</Text>
+        <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
+          The pilot server shows this payment as completed, but no matching payment is in your recent activity. Ask the customer to open their activity to see who they paid, and check your own recent activity together before anyone pays again.
+        </Text>
+        <HapticPressable onPress={() => onNavigate('home')} style={[styles.primaryButton, styles.resultButton, { backgroundColor: colors.button }]}>
+          <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>View recent activity</Text>
         </HapticPressable>
         <HapticPressable
           onPress={() => {
