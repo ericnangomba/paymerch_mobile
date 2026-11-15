@@ -361,6 +361,24 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
   }, [refresh]);
 
+  // Event-driven connectivity on web: no polling loop. The browser's own
+  // online/offline events flip the status, and regaining connectivity pulls
+  // one fresh sync. Native platforms keep failure-sniffing on refresh.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const handleOffline = () => setOnline(false);
+    const handleOnline = () => {
+      setOnline(true);
+      void refresh();
+    };
+    window.addEventListener('offline', handleOffline);
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [refresh]);
+
   const login = useCallback(
     async (pin: string): Promise<LoginOutcome> => {
       const phone = profile.phone;
