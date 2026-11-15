@@ -631,7 +631,7 @@ function AppSplashScreen({
   onWatchDemo: () => void;
 }) {
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { height: windowHeight, width: windowWidth } = useWindowDimensions();
   const [webHeight, setWebHeight] = useState(() =>
     typeof window === 'undefined' ? windowHeight : window.innerHeight,
   );
@@ -724,7 +724,7 @@ function AppSplashScreen({
           </HapticPressable>
           <HapticPressable onPress={onLogin} style={[styles.splashSecondaryCta, styles.splashLoginCta]} testID="splash-login">
             <Feather name="log-in" size={16} color="#211A12" />
-            <Text style={styles.splashSecondaryCtaText}>Already have an account? Log in</Text>
+            <Text style={[styles.splashSecondaryCtaText, windowWidth < 380 && { fontSize: 13.5 }]}>Already have an account? Log in</Text>
           </HapticPressable>
           <HapticPressable onPress={onWatchDemo} style={styles.splashInstallAction} testID="splash-watch-demo">
             <Text style={styles.splashQuietLink}>Watch a demo payment first</Text>
