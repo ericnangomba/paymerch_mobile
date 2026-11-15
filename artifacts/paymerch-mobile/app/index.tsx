@@ -2,7 +2,7 @@ import { Feather } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -361,10 +361,13 @@ function PinConfirmationModal({
   );
 }
 
-function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType | null }) {
+function AuthScreen({ initialAuthMode }: { initialAuthMode?: 'login' | 'register' }) {
   const colors = useColors();
   const { login, loginWithPhone, biometricLogin, isRegistered, biometricAvailable, biometricLabel, verifyBiometrics, enterDemoMode } = useWallet();
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  // An explicit entry choice from the splash (register pills vs log-in link)
+  // wins on mount; without one, registered devices land on the PIN pad and
+  // unregistered devices on registration, as before.
+  const [mode, setMode] = useState<'login' | 'register'>(initialAuthMode ?? (isRegistered ? 'login' : 'register'));
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [registrationMessage, setRegistrationMessage] = useState('');
@@ -403,9 +406,15 @@ function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType |
 
   // Registered wallets land on the PIN pad; unregistered ones on registration.
   // Entering demo mode marks a prepared profile as registered, which brings
-  // up its demo-PIN login without touching the registration form.
+  // up its demo-PIN login without touching the registration form. An explicit
+  // splash choice (initialAuthMode) is not overridden on mount.
+  const modeFollowsRegistration = useRef(!initialAuthMode);
   useEffect(() => {
-    setMode(isRegistered ? 'login' : 'register');
+    if (modeFollowsRegistration.current) {
+      setMode(isRegistered ? 'login' : 'register');
+      return;
+    }
+    modeFollowsRegistration.current = true;
   }, [isRegistered]);
 
   const handleBiometricUnlock = async () => {
@@ -450,7 +459,6 @@ function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType |
   if (mode === 'register') {
     return (
       <RegistrationScreen
-        initialAccountType={initialAccountType}
         onBack={() => setMode('login')}
         onRegistered={() => {
           setMode('login');
@@ -612,11 +620,13 @@ function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType |
 }
 
 function AppSplashScreen({
-  onContinue,
+  onRegister,
+  onLogin,
   onInstall,
   onWatchDemo,
 }: {
-  onContinue: (role: AccountType) => void;
+  onRegister: () => void;
+  onLogin: () => void;
   onInstall?: () => void;
   onWatchDemo: () => void;
 }) {
@@ -708,12 +718,13 @@ function AppSplashScreen({
         </Animated.View>
 
         <Animated.View style={[styles.splashMiddle, compactLayout && styles.splashMiddleCompact, { opacity: actionOpacity }]}>
-          <HapticPressable onPress={() => onContinue('business')} style={styles.splashPill} testID="splash-receive-payments">
-            <Text style={styles.splashPillText}>Receive payments</Text>
+          <HapticPressable onPress={onRegister} style={styles.splashPill} testID="splash-register">
+            <Text style={styles.splashPillText}>Create an account</Text>
             <Feather name="arrow-right" size={18} color="#211A12" />
           </HapticPressable>
-          <HapticPressable onPress={() => onContinue('individual')} style={styles.splashSecondaryCta} testID="splash-pay-trader">
-            <Text style={styles.splashSecondaryCtaText}>Pay a trader with QR</Text>
+          <HapticPressable onPress={onLogin} style={[styles.splashSecondaryCta, styles.splashLoginCta]} testID="splash-login">
+            <Feather name="log-in" size={16} color="#211A12" />
+            <Text style={styles.splashSecondaryCtaText}>Already have an account? Log in</Text>
           </HapticPressable>
           <HapticPressable onPress={onWatchDemo} style={styles.splashInstallAction} testID="splash-watch-demo">
             <Text style={styles.splashQuietLink}>Watch a demo payment first</Text>
@@ -2352,7 +2363,7 @@ function BottomNav({ screen, onNavigate }: { screen: Screen; onNavigate: (screen
 }
 
 export default function PaymerchHome() {
-  const { ready, signedIn } = useWallet();
+  const { ready, signedIn, isRegistered } = useWallet();
   const [screen, setScreen] = useState<Screen>('home');
   const [cashOutVisible, setCashOutVisible] = useState(false);
   const [cashOutAmount, setCashOutAmount] = useState('100');
@@ -2367,7 +2378,7 @@ export default function PaymerchHome() {
   const [topUpBankId, setTopUpBankId] = useState<string | null>(null);
   const [topUpBankPicker, setTopUpBankPicker] = useState(false);
   const [splashAcknowledged, setSplashAcknowledged] = useState(false);
-  const [preferredAccountType, setPreferredAccountType] = useState<AccountType | null>(null);
+  const [authEntryMode, setAuthEntryMode] = useState<'login' | 'register' | undefined>(undefined);
   const [installPrompt, setInstallPrompt] = useState<DeferredInstallPrompt | null>(null);
   const colors = useColors();
   const { cashOut, topUp, merchantBalance, buyerBalance, profile, enterDemoMode, demoMode } = useWallet();
@@ -2419,19 +2430,26 @@ export default function PaymerchHome() {
   if (!splashAcknowledged || !ready) {
     return (
       <AppSplashScreen
-        onContinue={(role) => {
-          setPreferredAccountType(role);
+        onRegister={() => {
+          // Devices already holding an account keep the PIN-pad landing; the
+          // register intent only applies when no local profile exists.
+          setAuthEntryMode(isRegistered ? undefined : 'register');
+          setSplashAcknowledged(true);
+        }}
+        onLogin={() => {
+          setAuthEntryMode('login');
           setSplashAcknowledged(true);
         }}
         onInstall={installPrompt ? () => void installApp() : undefined}
         onWatchDemo={() => {
+          setAuthEntryMode(undefined);
           setSplashAcknowledged(true);
           void enterDemoMode();
         }}
       />
     );
   }
-  if (!signedIn) return <AuthScreen initialAccountType={preferredAccountType} />;
+  if (!signedIn) return <AuthScreen initialAuthMode={authEntryMode} />;
 
   const navigate = (next: Screen) => {
     setCashOutVisible(false);
@@ -2936,6 +2954,7 @@ const styles = StyleSheet.create({
   splashHeadline: { fontFamily: 'Montserrat_700Bold', fontSize: 26, lineHeight: 32, color: '#211A12', textAlign: 'center', marginTop: 18 },
   splashSubline: { fontFamily: 'Montserrat_400Regular', fontSize: 14, lineHeight: 20, color: '#5F594D', textAlign: 'center', marginTop: 8, maxWidth: 300 },
   splashSecondaryCta: { minHeight: 52, borderRadius: 26, borderWidth: 1.5, borderColor: '#D9CDB0', backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', alignSelf: 'stretch' },
+  splashLoginCta: { flexDirection: 'row', gap: 8, borderColor: '#E9A820' },
   splashSecondaryCtaText: { fontFamily: 'Montserrat_700Bold', fontSize: 15, color: '#211A12' },
   splashQuietLink: { fontFamily: 'Montserrat_600SemiBold', fontSize: 13, color: '#57534A' },
   splashChipsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8 },
