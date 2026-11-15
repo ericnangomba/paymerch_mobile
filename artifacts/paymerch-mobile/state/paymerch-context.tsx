@@ -85,7 +85,11 @@ export type CompletePaymentResult =
   | 'INVALID_REQUEST'
   | 'EXPIRED'
   | 'INSUFFICIENT_BALANCE'
-  | 'ALREADY_USED';
+  | 'ALREADY_USED'
+  // The settlement call never got a server answer (network drop/timeout):
+  // the payment may or may not have settled. Never shown as a failure -
+  // the UI must check the request status before believing any outcome.
+  | 'UNKNOWN';
 
 // Distinguishes a wrong PIN from an unreachable server so the login screen
 // can say which one happened instead of blaming the PIN for a network drop.
@@ -607,8 +611,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           setPaymentRequest((current) => (current?.token === request.token ? null : current));
         }
         return response.result;
-      } catch {
-        return 'INVALID_REQUEST';
+      } catch (err: unknown) {
+        // 4xx answers are real server rejections with known outcomes. No
+        // status (network drop) or a 5xx means the answer was lost after the
+        // settlement attempt - it may still have landed (the route can fail
+        // after the transaction commits), so the outcome is unknown.
+        const status = (err as { status?: number })?.status;
+        return status && status < 500 ? 'INVALID_REQUEST' : 'UNKNOWN';
       }
     },
     [requestReauth, online, cacheWallet],

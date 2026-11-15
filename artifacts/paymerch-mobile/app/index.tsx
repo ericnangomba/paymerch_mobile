@@ -1404,8 +1404,10 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 
   const [permissionResponse, requestPermission] = useCameraPermissions();
   const [asked, setAsked] = useState(false);
-  const [result, setResult] = useState<'idle' | 'success' | 'failed'>('idle');
+  const [result, setResult] = useState<'idle' | 'success' | 'failed' | 'unknown'>('idle');
   const [failureMessage, setFailureMessage] = useState('');
+  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [unknownMessage, setUnknownMessage] = useState('');
   const [pinModalVisible, setPinModalVisible] = useState(false);
   const [pinError, setPinError] = useState('');
   const [scannedPayload, setScannedPayload] = useState<QrPayload | null>(null);
@@ -1490,12 +1492,20 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
       setPinError('');
     } else if (outcome === 'INVALID_AUTH') {
       setPinError('Invalid PIN. Please try again.');
+    } else if (outcome === 'UNKNOWN') {
+      // The settlement answer was lost: the payment may or may not have
+      // landed. Keep the scanned request and let the merchant check the
+      // server's record before believing anything.
+      setPinModalVisible(false);
+      setPinError('');
+      setUnknownMessage('');
+      setResult('unknown');
     } else {
       const messages = {
         INVALID_REQUEST: 'This QR payment request is invalid.',
         EXPIRED: 'This QR has expired. Ask the customer to create a new one.',
         INSUFFICIENT_BALANCE: 'The customer does not have enough test money for this payment.',
-        ALREADY_USED: 'This QR code has already been used.',
+        ALREADY_USED: 'This payment has already been completed. Check Recent activity.',
       } as const;
       setPinModalVisible(false);
       setPinError('');
@@ -1536,6 +1546,74 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
           style={styles.textButton}
         >
           <Text style={[styles.textButtonLabel, { color: colors.foreground }]}>Scan another payment</Text>
+        </HapticPressable>
+      </View>
+    );
+  }
+
+  // Status check after a lost settlement answer. The token is single-use and
+  // the server claim is atomic, so checking and (when still open) retrying
+  // can never charge the customer twice.
+  const checkUnknownStatus = async () => {
+    if (!scannedPayload || checkingStatus) return;
+    setCheckingStatus(true);
+    setUnknownMessage('');
+    const statusPreview = await previewPaymentRequest(scannedPayload.token);
+    setCheckingStatus(false);
+    if (!statusPreview) {
+      setUnknownMessage('Still cannot reach the pilot server. Check Recent activity before taking this payment again.');
+      return;
+    }
+    if (statusPreview.status === 'COMPLETED') {
+      setPreview(statusPreview);
+      setResult('success');
+      return;
+    }
+    if (statusPreview.status === 'OPEN') {
+      setUnknownMessage('');
+      setPinModalVisible(true);
+      return;
+    }
+    setResult('failed');
+    setFailureMessage(
+      statusPreview.status === 'EXPIRED'
+        ? 'This QR has expired. Ask the customer to create a new one.'
+        : 'This payment has already been completed. Check Recent activity.',
+    );
+  };
+
+  if (result === 'unknown') {
+    return (
+      <View style={[styles.successRoot, { backgroundColor: colors.background, paddingTop: insets.top + 18 }]}>
+        <View style={[styles.successMark, { backgroundColor: colors.warm }]}>
+          <Feather name="wifi-off" size={34} color={colors.warning} />
+        </View>
+        <Text style={[styles.successKicker, { color: colors.mutedForeground }]}>CONNECTION DROPPED</Text>
+        <Text style={[styles.successTitle, { color: colors.foreground }]}>Not confirmed yet</Text>
+        <Text style={[styles.successSubtitle, { color: colors.mutedForeground }]}>
+          {preview ? `${zar(preview.amount)} from ${preview.payerName}: ` : ''}the connection was lost before the pilot server answered. The payment may still have gone through - check before asking the customer to pay again.
+        </Text>
+        {unknownMessage ? (
+          <Text style={[styles.successSubtitle, { color: colors.warning }]}>{unknownMessage}</Text>
+        ) : null}
+        <HapticPressable
+          disabled={checkingStatus}
+          onPress={() => void checkUnknownStatus()}
+          style={[styles.primaryButton, styles.resultButton, { backgroundColor: colors.button, opacity: checkingStatus ? 0.6 : 1 }]}
+        >
+          <Text style={[styles.primaryButtonText, { color: colors.buttonForeground }]}>{checkingStatus ? 'Checking…' : 'Check status now'}</Text>
+        </HapticPressable>
+        <HapticPressable onPress={() => onNavigate('home')} style={styles.textButton}>
+          <Text style={[styles.textButtonLabel, { color: colors.foreground }]}>View recent activity</Text>
+        </HapticPressable>
+        <HapticPressable
+          onPress={() => {
+            setResult('idle');
+            resetScan();
+          }}
+          style={styles.textButton}
+        >
+          <Text style={[styles.textButtonLabel, { color: colors.mutedForeground }]}>Back to scanner</Text>
         </HapticPressable>
       </View>
     );
