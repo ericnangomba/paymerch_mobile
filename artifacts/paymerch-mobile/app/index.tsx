@@ -233,7 +233,7 @@ function PinConfirmationModal({
   onClearError,
 }: {
   visible: boolean;
-  onConfirm: (pin: string) => void;
+  onConfirm: (pin: string) => void | Promise<void>;
   onCancel: () => void;
   title: string;
   summary?: string;
@@ -251,7 +251,14 @@ function PinConfirmationModal({
   const displayError = externalError || error;
 
   const complete = (next: string) => {
-    onConfirm(next);
+    // Await the confirm handler so an outcome that keeps the sheet open (a
+    // rejected PIN) gives the pad back instead of a permanently stuck
+    // "Processing payment…" spinner; the user can retype immediately.
+    // Outcomes that close the sheet reset through the visibility effect.
+    void Promise.resolve(onConfirm(next)).finally(() => {
+      setIsProcessing(false);
+      setPin('');
+    });
   };
 
   const handleDigit = (digit: string) => {

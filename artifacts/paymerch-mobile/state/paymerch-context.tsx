@@ -630,11 +630,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   const verifyReceipt = useCallback(async (token: string, expectedAmount: number): Promise<'RECEIVED' | 'NOT_RECEIVED' | 'UNREACHABLE'> => {
     try {
-      // Always a fresh authoritative fetch, never the local cache. The wallet
-      // endpoint returns the newest 50 ledger entries; a settlement from this
-      // scan (seconds old) would be among them if it existed, so absence is
-      // conclusive here. Binding requires the token reference AND the exact
-      // amount, so a different payment can never pass as this one.
+      // Always a fresh authenticated fetch, never the local cache. A positive
+      // match is proof of receipt: binding requires the exact token reference
+      // AND the exact amount in our own ledger, so no other payment can pass
+      // as this one. Absence is NOT proof of non-payment: the settled answer
+      // may have been lost, other activity can push an entry past the wallet
+      // endpoint's newest-50 window, or a retry may settle later. The caller
+      // treats NOT_RECEIVED as unconfirmed and steers to reconcile, never to
+      // charge again.
       const wallet = await apiGetWallet();
       applyWalletState(wallet, { setBuyerBalance, setMerchantBalance, setTransactions });
       await cacheWallet(wallet);
