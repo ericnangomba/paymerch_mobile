@@ -11,6 +11,7 @@ import type { Profile, WalletState } from "./wallet";
 import { buildWalletState } from "./wallet";
 import { hashPin, verifyPinHash } from "../lib/pins";
 import {
+  AmbiguousPhoneError,
   createAccount,
   createReauthToken,
   createSession,
@@ -83,7 +84,18 @@ export function createAuthRouter(resolveDb: DbResolver): Router {
         return;
       }
       const db = await resolveDb();
-      if (await findUserByPhone(db, phone)) {
+      let existingUser: User | null;
+      try {
+        existingUser = await findUserByPhone(db, phone);
+      } catch (err) {
+        // Fail closed: duplicate stored spellings mean the number is taken.
+        if (err instanceof AmbiguousPhoneError) {
+          res.status(409).json({ message: "This phone number is already registered" });
+          return;
+        }
+        throw err;
+      }
+      if (existingUser) {
         res.status(409).json({ message: "This phone number is already registered" });
         return;
       }
@@ -114,7 +126,18 @@ export function createAuthRouter(resolveDb: DbResolver): Router {
         return;
       }
       const db = await resolveDb();
-      const user = await findUserByPhone(db, phone);
+      let user: User | null;
+      try {
+        user = await findUserByPhone(db, phone);
+      } catch (err) {
+        // Fail closed with the generic rejection: an ambiguous number signs
+        // nothing in until the duplicate is resolved.
+        if (err instanceof AmbiguousPhoneError) {
+          res.status(401).json({ message: "Invalid phone number or PIN" });
+          return;
+        }
+        throw err;
+      }
       if (!user || !verifyPinHash(parsed.data.pin, user.pinHash)) {
         recordPinFailure(`login:${phone}`);
         res.status(401).json({ message: "Invalid phone number or PIN" });

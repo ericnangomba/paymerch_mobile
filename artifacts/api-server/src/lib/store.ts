@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { and, desc, eq, gt, gte, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, inArray, sql } from "drizzle-orm";
 import type { PgDatabase, PgQueryResultHKT } from "drizzle-orm/pg-core";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import {
@@ -47,8 +47,29 @@ export class InsufficientBalanceError extends Error {
   readonly name = "InsufficientBalanceError";
 }
 
+// Phone numbers are matched in canonical South African local form (leading
+// 0). Accounts registered before canonicalization may hold the "27..."
+// spelling, so lookups compare against every stored spelling of the canonical
+// number instead of rewriting existing rows. New accounts are stored in the
+// canonical form.
 export function normalizePhone(phone: string): string {
-  return phone.replace(/\D/g, "");
+  const digits = phone.replace(/\D/g, "");
+  if (/^0027\d{9}$/.test(digits)) return "0" + digits.slice(4);
+  if (/^27\d{9}$/.test(digits)) return "0" + digits.slice(2);
+  return digits;
+}
+
+// Every stored spelling that could hold a canonical number: the canonical
+// local form plus the legacy international form.
+export function phoneLookupVariants(canonicalPhone: string): string[] {
+  if (/^0\d{9}$/.test(canonicalPhone)) return [canonicalPhone, `27${canonicalPhone.slice(1)}`];
+  return [canonicalPhone];
+}
+
+// Two stored rows match one canonical number. No spelling may sign in or
+// register against it until the duplicate is resolved: callers fail closed.
+export class AmbiguousPhoneError extends Error {
+  readonly name = "AmbiguousPhoneError";
 }
 
 export function randsToCents(amount: number): number | null {
@@ -62,8 +83,11 @@ export async function findUserByPhone(q: Q, phone: string): Promise<User | null>
   const rows = await q
     .select()
     .from(usersTable)
-    .where(eq(usersTable.phone, normalizePhone(phone)))
-    .limit(1);
+    .where(inArray(usersTable.phone, phoneLookupVariants(normalizePhone(phone))))
+    .limit(2);
+  if (rows.length > 1) {
+    throw new AmbiguousPhoneError("More than one stored account matches this phone number");
+  }
   return rows[0] ?? null;
 }
 
