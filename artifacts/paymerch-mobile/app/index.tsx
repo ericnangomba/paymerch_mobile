@@ -123,8 +123,11 @@ type QrPayload = {
 
 const QR_PREFIX = 'PM1:';
 
+// Keep the QR compact and robust: plain JSON, no URI escaping. Scanners still
+// accept the legacy URI-escaped format (see decodeQrPayload), and old builds
+// read this format because decodeURIComponent is a no-op on JSON without '%'.
 const encodeQrPayload = (payload: QrPayload): string =>
-  `${QR_PREFIX}${encodeURIComponent(JSON.stringify(payload))}`;
+  `${QR_PREFIX}${JSON.stringify(payload)}`;
 
 const buildQrPayload = (request: PaymentRequest, name: string): QrPayload => ({
   token: request.token,
@@ -135,27 +138,132 @@ const buildQrPayload = (request: PaymentRequest, name: string): QrPayload => ({
 
 const decodeQrPayload = (data: string): QrPayload | null => {
   if (!data || data.length > 2048 || !data.startsWith(QR_PREFIX)) return null;
+  const raw = data.slice(QR_PREFIX.length);
+  let obj: unknown = null;
   try {
-    const obj = JSON.parse(decodeURIComponent(data.slice(QR_PREFIX.length)));
-    if (
-      obj &&
-      typeof obj.token === 'string' &&
-      obj.token.length > 0 &&
-      obj.token.length <= 128 &&
-      typeof obj.amount === 'number' &&
-      Number.isFinite(obj.amount) &&
-      typeof obj.expiresAt === 'number' &&
-      Number.isFinite(obj.expiresAt) &&
-      typeof obj.name === 'string' &&
-      obj.name.length <= 100
-    ) {
-      return obj as QrPayload;
-    }
+    obj = JSON.parse(raw);
   } catch {
-    // Invalid QR content; handled by the caller.
+    // Codes generated before the compact format were URI-escaped.
+    try {
+      obj = JSON.parse(decodeURIComponent(raw));
+    } catch {
+      return null;
+    }
+  }
+  if (
+    obj &&
+    typeof obj === 'object' &&
+    typeof (obj as QrPayload).token === 'string' &&
+    (obj as QrPayload).token.length > 0 &&
+    (obj as QrPayload).token.length <= 128 &&
+    typeof (obj as QrPayload).amount === 'number' &&
+    Number.isFinite((obj as QrPayload).amount) &&
+    typeof (obj as QrPayload).expiresAt === 'number' &&
+    Number.isFinite((obj as QrPayload).expiresAt) &&
+    typeof (obj as QrPayload).name === 'string' &&
+    (obj as QrPayload).name.length <= 100
+  ) {
+    return obj as QrPayload;
   }
   return null;
 };
+
+/**
+ * Web QR detection. expo-camera's web barcode shim swallows detector errors
+ * (its onError is never wired to CameraView) and delivers results wrapped as
+ * { nativeEvent }, which the scan handler does not expect - so on web the
+ * scanner runs its own loop over the camera <video>: native BarcodeDetector
+ * where it exists (Chrome on Android), ZXing (pure JS, bundled) everywhere
+ * else. A browser where neither works gets a visible error instead of a
+ * camera that silently never detects.
+ */
+type NativeBarcodeDetector = {
+  detect: (source: HTMLVideoElement) => Promise<Array<{ rawValue?: string }>>;
+};
+
+type ZxingModule = typeof import('@zxing/library');
+
+class WebQrDetector {
+  private native: NativeBarcodeDetector | null = null;
+  private nativeBroken = false;
+  private zxing: ZxingModule | null = null;
+  private zxingReader: InstanceType<ZxingModule['QRCodeReader']> | null = null;
+  private zxingBroken = false;
+  private canvas: HTMLCanvasElement | null = null;
+
+  async detect(video: HTMLVideoElement): Promise<string | null> {
+    if (!this.nativeBroken && !this.native) {
+      try {
+        const Ctor = (
+          globalThis as unknown as {
+            BarcodeDetector?: new (options: { formats: string[] }) => NativeBarcodeDetector;
+          }
+        ).BarcodeDetector;
+        if (!Ctor) throw new Error('BarcodeDetector unavailable');
+        const detector = new Ctor({ formats: ['qr_code'] });
+        await detector.detect(video); // probe: some builds expose the class but cannot detect
+        this.native = detector;
+      } catch {
+        this.native = null;
+        this.nativeBroken = true;
+      }
+    }
+    if (this.native) {
+      try {
+        const results = await this.native.detect(video);
+        if (results.length > 0 && results[0].rawValue) return results[0].rawValue;
+        return null;
+      } catch {
+        this.native = null;
+        this.nativeBroken = true;
+      }
+    }
+    if (this.zxingBroken) return null;
+    try {
+      if (!this.zxing) {
+        this.zxing = await import('@zxing/library');
+        this.zxingReader = new this.zxing.QRCodeReader();
+      }
+      const z = this.zxing;
+      const width = video.videoWidth;
+      const height = video.videoHeight;
+      if (!width || !height) return null;
+      this.canvas = this.canvas ?? document.createElement('canvas');
+      this.canvas.width = width;
+      this.canvas.height = height;
+      const ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return null;
+      ctx.drawImage(video, 0, 0, width, height);
+      const frame = ctx.getImageData(0, 0, width, height);
+      const gray = new Uint8ClampedArray(width * height);
+      for (let i = 0, j = 0; i < frame.data.length; i += 4, j++) {
+        gray[j] = (frame.data[i] + frame.data[i + 1] * 2 + frame.data[i + 2]) / 4;
+      }
+      const source = new z.RGBLuminanceSource(gray, width, height);
+      const bitmap = new z.BinaryBitmap(new z.HybridBinarizer(source));
+      return this.zxingReader ? this.zxingReader.decode(bitmap).getText() : null;
+    } catch (error) {
+      if (!this.zxing) {
+        // The fallback module itself failed to load: no detector remains.
+        this.zxingBroken = true;
+        return null;
+      }
+      const z = this.zxing;
+      if (
+        error instanceof z.NotFoundException ||
+        error instanceof z.FormatException ||
+        error instanceof z.ChecksumException
+      ) {
+        return null; // no decodable code in this frame
+      }
+      return null;
+    }
+  }
+
+  get unavailable(): boolean {
+    return this.nativeBroken && this.zxingBroken;
+  }
+}
 
 const timeLabel = (timestamp: number) => {
   const minutes = Math.max(1, Math.round((Date.now() - timestamp) / 60_000));
@@ -1448,7 +1556,7 @@ function QRCode({ payload }: { payload: QrPayload }) {
         color="#0A0A0A"
         backgroundColor="#FFFFFF"
         quietZone={6}
-        ecl="M"
+        ecl="Q"
         logo={logoMark}
         logoSize={36}
         logoBackgroundColor="#FFFFFF"
@@ -1619,6 +1727,9 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
   const [scanned, setScanned] = useState(false);
   const [scanError, setScanError] = useState('');
   const [cameraError, setCameraError] = useState(false);
+  const cameraContainerRef = useRef<View>(null);
+  const webDetectorRef = useRef<WebQrDetector | null>(null);
+  const cameraGranted = !!permissionResponse?.granted && !cameraError;
 
   useEffect(() => {
     // Native platforms request the camera permission up front. On web the
@@ -1650,6 +1761,45 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Web runs its own detection loop (see WebQrDetector above): it polls the
+  // camera <video>, uses native BarcodeDetector where available and the
+  // bundled ZXing fallback elsewhere, and surfaces a visible error when a
+  // browser can do neither - instead of expo-camera's web shim, which
+  // swallows every detector error and delivers an event shape the handler
+  // does not expect.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !cameraGranted || scanned) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const detector = webDetectorRef.current ?? new WebQrDetector();
+    webDetectorRef.current = detector;
+    const tick = async () => {
+      if (cancelled) return;
+      try {
+        const node = cameraContainerRef.current as unknown as {
+          querySelector?: (selector: string) => HTMLVideoElement | null;
+        } | null;
+        const video = node?.querySelector?.('video') ?? null;
+        if (video && video.readyState >= 2) {
+          const text = await detector.detect(video);
+          if (text && !cancelled) handleBarcodeScanned({ data: text });
+          if (!cancelled && detector.unavailable) {
+            setScanError('This browser cannot scan QR codes. Try the latest Chrome.');
+          }
+        }
+      } catch {
+        // A single failed frame must never stop the scan loop.
+      }
+      if (!cancelled) timer = setTimeout(tick, 350);
+    };
+    timer = setTimeout(tick, 350);
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraGranted, scanned]);
+
   const processPayload = async (payload: QrPayload) => {
     if (payload.expiresAt <= Date.now()) {
       setScanError('This QR has expired.');
@@ -1680,9 +1830,13 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
     setPinModalVisible(true);
   };
 
-  const handleBarcodeScanned = (scanningResult: { data: string }) => {
+  const handleBarcodeScanned = (scanningResult: { data?: string; nativeEvent?: { data?: string } }) => {
     if (scanned) return;
-    const payload = decodeQrPayload(scanningResult.data);
+    // Native expo-camera delivers { data }; its web shim wraps the same result
+    // as { nativeEvent: { data } }. Accept both so a detected code is never
+    // mistaken for a foreign one.
+    const data = scanningResult?.data ?? scanningResult?.nativeEvent?.data ?? '';
+    const payload = decodeQrPayload(data);
     if (!payload) {
       setScanError('That is not a Paymerch QR code.');
       return;
@@ -1933,16 +2087,21 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
 
       <View style={[styles.viewfinder, { height: canUseCamera ? 280 : 300, marginTop: 40 }]}>
         {canUseCamera ? (
-          <CameraView
-            style={StyleSheet.absoluteFill}
-            facing="back"
-            barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-            onBarcodeScanned={scanned ? undefined : handleBarcodeScanned}
-            onMountError={() => setCameraError(true)}
-            onCameraReady={() => {
-              setCameraError(false);
-            }}
-          />
+          <View ref={cameraContainerRef} style={StyleSheet.absoluteFill}>
+            <CameraView
+              style={StyleSheet.absoluteFill}
+              facing="back"
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              // On web, expo-camera's shim never reports detector errors and
+              // wraps results as { nativeEvent }; the WebQrDetector loop above
+              // handles web scanning instead.
+              onBarcodeScanned={Platform.OS === 'web' || scanned ? undefined : handleBarcodeScanned}
+              onMountError={() => setCameraError(true)}
+              onCameraReady={() => {
+                setCameraError(false);
+              }}
+            />
+          </View>
         ) : null}
         <View style={[styles.corner, styles.cornerTopLeft]} />
         <View style={[styles.corner, styles.cornerTopRight]} />

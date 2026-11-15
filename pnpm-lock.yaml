@@ -331,6 +331,9 @@ importers:
 
   artifacts/paymerch-mobile:
     dependencies:
+      '@zxing/library':
+        specifier: ^0.23.0
+        version: 0.23.0
       expo-camera:
         specifier: ^57.0.5
         version: 57.0.5(expo@57.0.21)(react-native-web@0.21.2(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-native@0.86.3(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3))(react@19.2.3)
@@ -371,9 +374,6 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
-      '@zxing/library':
-        specifier: ^0.23.0
-        version: 0.23.0
       babel-plugin-react-compiler:
         specifier: ^19.0.0-beta-e993439-20250117
         version: 19.0.0-beta-ebf51a3-20250411
