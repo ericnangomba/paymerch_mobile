@@ -1,4 +1,5 @@
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -635,10 +636,23 @@ function AppSplashScreen({
   return splashContent;
 }
 
+// Registration draft: safe fields only. The PIN, PIN confirmation, bank
+// account holder and bank account number are never persisted - they are
+// re-entered at submission time on the live server.
+type RegistrationDraft = {
+  accountType: AccountType;
+  name: string;
+  phone: string;
+  businessCategory: BusinessCategory;
+  bankId: string | null;
+  bankAccountType: 'Cheque' | 'Savings';
+};
+const REGISTRATION_DRAFT_KEY = 'paymerch-registration-draft-v1';
+
 function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBack: () => void; onRegistered: () => void; initialAccountType?: AccountType | null }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { registerAccount, enterDemoMode } = useWallet();
+  const { registerAccount, enterDemoMode, online } = useWallet();
   const [accountType, setAccountType] = useState<AccountType>(initialAccountType ?? 'business');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -651,8 +665,57 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
   const [confirmPin, setConfirmPin] = useState('');
   const [showPin, setShowPin] = useState(false);
   const [error, setError] = useState('');
+  const [draftNotice, setDraftNotice] = useState(false);
+
+  // Restore a saved draft once. Only non-secret fields come back; the banner
+  // makes clear the account was never created.
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(REGISTRATION_DRAFT_KEY);
+        if (!raw || cancelled) return;
+        const draft = JSON.parse(raw) as Partial<RegistrationDraft>;
+        if (draft.accountType === 'business' || draft.accountType === 'individual') setAccountType(draft.accountType);
+        if (typeof draft.name === 'string') setName(draft.name);
+        if (typeof draft.phone === 'string') setPhone(draft.phone);
+        if (draft.businessCategory) setCategory(draft.businessCategory as BusinessCategory);
+        if (typeof draft.bankId === 'string') setBankId(draft.bankId);
+        if (draft.bankAccountType === 'Cheque' || draft.bankAccountType === 'Savings') setBankAccountType(draft.bankAccountType);
+        if (!cancelled) setDraftNotice(true);
+      } catch {
+        await AsyncStorage.removeItem(REGISTRATION_DRAFT_KEY);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Save the draft as the form fills in, so a dropped connection or a closed
+  // app never loses the details. Nothing is submitted until the user taps
+  // Create account while online.
+  useEffect(() => {
+    if (!name && !phone && !bankId) return;
+    const draft: RegistrationDraft = { accountType, name, phone, businessCategory: category, bankId, bankAccountType };
+    void AsyncStorage.setItem(REGISTRATION_DRAFT_KEY, JSON.stringify(draft));
+  }, [accountType, name, phone, category, bankId, bankAccountType]);
+
+  const discardDraft = async () => {
+    await AsyncStorage.removeItem(REGISTRATION_DRAFT_KEY);
+    setDraftNotice(false);
+    setName('');
+    setPhone('');
+    setBankId(null);
+    setBankAccountType('Cheque');
+    setCategory('Spaza shop');
+  };
 
   const submit = async () => {
+    if (!online) {
+      setError('You are offline. Your details are saved as a draft on this device - come back and submit when you are connected. No account is created until then.');
+      return;
+    }
     const normalizedPhone = phone.replace(/\D/g, '');
     if (name.trim().length < 2) {
       setError(accountType === 'business' ? 'Enter your business or trading name.' : 'Enter your full name.');
@@ -692,9 +755,10 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
     };
     const ok = await registerAccount(profile, pin);
     if (!ok) {
-      setError('Could not create your account. The number may already be registered, or the server is unreachable.');
+      setError('Could not create your account. The number may already be registered, or the server is unreachable. Your details stay saved on this device as a draft.');
       return;
     }
+    await AsyncStorage.removeItem(REGISTRATION_DRAFT_KEY);
     onRegistered();
   };
 
@@ -727,6 +791,20 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
           Set up your account and PIN for secure transactions.
         </Text>
       </View>
+      {draftNotice ? (
+        <View style={[styles.offlineBanner, { backgroundColor: colors.warm, marginHorizontal: 20, marginBottom: 12 }]}>
+          <Feather name="edit-3" size={17} color={colors.warning} />
+          <View style={styles.offlineCopy}>
+            <Text style={[styles.offlineTitle, { color: colors.foreground }]}>Draft restored</Text>
+            <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>
+              Your account is not created yet. Review your details and tap Create account while you are online. For your security your PIN and bank account number were not saved.
+            </Text>
+            <HapticPressable onPress={() => void discardDraft()}>
+              <Text style={[styles.offlineText, { color: colors.destructive, fontFamily: 'Montserrat_600SemiBold' }]}>Discard draft</Text>
+            </HapticPressable>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.registrationSection}>
         <Text style={[styles.registrationSectionTitle, { color: colors.foreground }]}>I am registering as</Text>
         <Text style={[styles.registrationSectionHint, { color: colors.mutedForeground }]}>Choose the account that best describes you.</Text>
