@@ -110,6 +110,7 @@ type WalletContextValue = {
   biometricLabel: string;
   lastSyncedAt: number | null;
   login: (pin: string) => Promise<LoginOutcome>;
+  loginWithPhone: (phone: string, pin: string) => Promise<LoginOutcome>;
   biometricLogin: () => Promise<void>;
   verifyBiometrics: () => Promise<boolean>;
   registerAccount: (profile: UserProfile, pin: string) => Promise<boolean>;
@@ -408,6 +409,26 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [profile.phone, acceptSession],
+  );
+
+  // Existing-account login from a device that has no local profile: the
+  // caller supplies the phone number explicitly (the welcome-back PIN pad
+  // uses the stored profile instead). Same server endpoint, same generic
+  // 401 wording - no phone-enumeration signal added on the client either.
+  const loginWithPhone = useCallback(
+    async (phone: string, pin: string): Promise<LoginOutcome> => {
+      try {
+        const session = await apiLogin({ phone: phone.trim(), pin });
+        await acceptSession(session);
+        return 'OK';
+      } catch (err: unknown) {
+        const status = (err as { status?: number })?.status;
+        if (status === 401 || status === 429) return 'WRONG_PIN';
+        setOnline(false);
+        return 'OFFLINE';
+      }
+    },
+    [acceptSession],
   );
 
   const biometricLogin = useCallback(async () => {
@@ -721,6 +742,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       biometricLabel,
       lastSyncedAt,
       login,
+      loginWithPhone,
       biometricLogin,
       verifyBiometrics,
       registerAccount,
@@ -756,6 +778,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       biometricLabel,
       lastSyncedAt,
       login,
+      loginWithPhone,
       biometricLogin,
       verifyBiometrics,
       registerAccount,

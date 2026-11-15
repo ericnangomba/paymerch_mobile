@@ -363,11 +363,43 @@ function PinConfirmationModal({
 
 function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType | null }) {
   const colors = useColors();
-  const { login, biometricLogin, isRegistered, biometricAvailable, biometricLabel, verifyBiometrics, enterDemoMode } = useWallet();
+  const { login, loginWithPhone, biometricLogin, isRegistered, biometricAvailable, biometricLabel, verifyBiometrics, enterDemoMode } = useWallet();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [registrationMessage, setRegistrationMessage] = useState('');
+  const [loginPhone, setLoginPhone] = useState('');
+  const [loginPin, setLoginPin] = useState('');
+  const [loginBusy, setLoginBusy] = useState(false);
+
+  // Existing-account login for a device with no local profile (fresh install,
+  // cleared storage, or after leaving the demo): phone + PIN against the
+  // pilot server, which restores the full account on success.
+  const handlePhoneLogin = async () => {
+    if (loginBusy) return;
+    const digitCount = loginPhone.replace(/\D/g, '').length;
+    if (digitCount < 9 || digitCount > 15) {
+      setError('Enter the mobile number you registered with.');
+      return;
+    }
+    if (loginPin.length !== 6) {
+      setError('Enter your 6-digit PIN.');
+      return;
+    }
+    setLoginBusy(true);
+    setError('');
+    try {
+      const outcome = await loginWithPhone(loginPhone, loginPin);
+      if (outcome === 'OFFLINE') {
+        setError('No connection right now. Check your signal and try again.');
+      } else if (outcome !== 'OK') {
+        setError('Invalid phone number or PIN. Please try again.');
+      }
+    } finally {
+      setLoginBusy(false);
+      setLoginPin('');
+    }
+  };
 
   // Registered wallets land on the PIN pad; unregistered ones on registration.
   // Entering demo mode marks a prepared profile as registered, which brings
@@ -429,7 +461,75 @@ function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType |
     );
   }
 
-  const authContent = (
+  const phoneLoginContent = (
+    <ScrollView
+      style={[styles.authRoot, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.authScrollContent}
+      showsVerticalScrollIndicator={false}
+      bounces={false}
+      keyboardShouldPersistTaps="handled"
+    >
+      <View style={styles.authTop}>
+        <Image source={logo} style={{ width: 210, height: 63, marginTop: 8 }} resizeMode="contain" />
+        <Text style={styles.authTagline}>Get paid with one scan.</Text>
+      </View>
+      <View style={[styles.authSheet, { backgroundColor: colors.card }]}>
+        <Text style={[styles.authEyebrow, { color: colors.mutedForeground }]}>EXISTING ACCOUNT</Text>
+        <Text style={[styles.authTitle, { color: colors.foreground }]}>Log in</Text>
+        <Text style={[styles.authSubtitle, { color: colors.mutedForeground }]}>
+          Enter the mobile number and PIN you registered with. Your wallet restores from the pilot server.
+        </Text>
+        <View style={styles.registrationFieldGroup}>
+          <Text style={[styles.registrationFieldLabel, { color: colors.foreground }]}>MOBILE NUMBER</Text>
+          <View style={[styles.registrationInputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="smartphone" size={18} color={colors.mutedForeground} />
+            <TextInput
+              value={loginPhone}
+              onChangeText={(value) => { setLoginPhone(value); setError(''); }}
+              placeholder="+27 72 555 0198"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="phone-pad"
+              autoCapitalize="none"
+              style={[styles.registrationInput, { color: colors.foreground }]}
+              returnKeyType="next"
+              testID="login-phone"
+            />
+          </View>
+        </View>
+        <View style={styles.registrationFieldGroup}>
+          <Text style={[styles.registrationFieldLabel, { color: colors.foreground }]}>6-DIGIT PIN</Text>
+          <View style={[styles.registrationInputShell, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Feather name="lock" size={18} color={colors.mutedForeground} />
+            <TextInput
+              value={loginPin}
+              onChangeText={(value) => { setLoginPin(value.replace(/\D/g, '').slice(0, 6)); setError(''); }}
+              placeholder="Your PIN"
+              placeholderTextColor={colors.mutedForeground}
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={6}
+              style={[styles.registrationInput, { color: colors.foreground }]}
+              returnKeyType="done"
+              onSubmitEditing={() => void handlePhoneLogin()}
+              testID="login-pin"
+            />
+          </View>
+        </View>
+        {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error}</Text> : null}
+        <HapticPressable onPress={() => void handlePhoneLogin()} style={[styles.registrationSubmitButton, { backgroundColor: colors.button }]} testID="login-submit">
+          <Feather name="log-in" size={18} color={colors.buttonForeground} />
+          <Text style={[styles.registrationSubmitText, { color: colors.buttonForeground }]}>{loginBusy ? 'Logging in…' : 'Log in'}</Text>
+          <Feather name="arrow-right" size={18} color={colors.buttonForeground} />
+        </HapticPressable>
+        <HapticPressable onPress={() => { setError(''); setMode('register'); }} style={styles.biometricButton} testID="goto-register">
+          <Feather name="user-plus" size={17} color={colors.primary} />
+          <Text style={[styles.biometricText, { color: colors.primary }]}>New here? Create an account</Text>
+        </HapticPressable>
+      </View>
+    </ScrollView>
+  );
+
+  const pinPadContent = (
     <ScrollView
       style={[styles.authRoot, { backgroundColor: colors.background }]}
       contentContainerStyle={styles.authScrollContent}
@@ -494,6 +594,10 @@ function AuthScreen({ initialAccountType }: { initialAccountType?: AccountType |
       </View>
     </ScrollView>
   );
+
+  // The welcome-back PIN pad only makes sense with a locally stored profile;
+  // without one, the phone-number login is the working route back in.
+  const authContent = isRegistered ? pinPadContent : phoneLoginContent;
 
   // Add web container for proper centering on web
   if (Platform.OS === 'web') {
@@ -1003,6 +1107,10 @@ function RegistrationScreen({ onBack, onRegistered, initialAccountType }: { onBa
         <Feather name="shield" size={18} color={colors.buttonForeground} />
         <Text style={[styles.registrationSubmitText, { color: colors.buttonForeground }]}>Create account</Text>
         <Feather name="arrow-right" size={18} color={colors.buttonForeground} />
+      </HapticPressable>
+      <HapticPressable onPress={onBack} style={styles.biometricButton} testID="goto-login">
+        <Feather name="log-in" size={17} color={colors.primary} />
+        <Text style={[styles.biometricText, { color: colors.primary }]}>Already have an account? Log in</Text>
       </HapticPressable>
       <View style={[styles.registrationNoteCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
         <Feather name="info" size={16} color={colors.mutedForeground} />
