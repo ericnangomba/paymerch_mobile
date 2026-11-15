@@ -367,8 +367,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
     const handleOffline = () => setOnline(false);
+    // A browser online event is a hint, not proof of reachability: refresh
+    // sets the final state from the server's actual answer (and only stamps
+    // the sync time when that answer arrives).
     const handleOnline = () => {
-      setOnline(true);
       void refresh();
     };
     window.addEventListener('offline', handleOffline);

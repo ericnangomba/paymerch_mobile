@@ -1117,7 +1117,7 @@ function HomeScreen({
 }) {
   const colors = useColors();
   const insets = useSafeAreaInsets();
-  const { buyerBalance, merchantBalance, online, toggleOnline, transactions, profile, lastSyncedAt } = useWallet();
+  const { buyerBalance, merchantBalance, online, toggleOnline, transactions, profile, lastSyncedAt, demoMode } = useWallet();
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
@@ -1201,9 +1201,11 @@ function HomeScreen({
           <View style={styles.offlineCopy}>
             <Text style={[styles.offlineTitle, { color: colors.foreground }]}>You’re offline</Text>
             <Text style={[styles.offlineText, { color: colors.mutedForeground }]}>
-              {lastSyncedAt
-                ? `Balances last synced ${formatSyncedAt(lastSyncedAt)} and may be out of date. Payments are unavailable until you reconnect.`
-                : 'Balances shown may be out of date. Payments are unavailable until you reconnect.'}
+              {demoMode
+                ? 'You’re offline — the local demo keeps working; these balances live on this device only.'
+                : lastSyncedAt
+                  ? `Balances last synced ${formatSyncedAt(lastSyncedAt)} and may be out of date. Payments are unavailable until you reconnect.`
+                  : 'Balances shown may be out of date. Payments are unavailable until you reconnect.'}
             </Text>
           </View>
         </View>
@@ -1944,11 +1946,13 @@ function SettingsScreen({ onBack }: { onBack: () => void }) {
           <View style={styles.settingCopy}>
             <Text style={[styles.settingTitle, { color: colors.foreground }]}>{online ? 'Connected' : 'Offline'}</Text>
             <Text style={[styles.settingSubtitle, { color: colors.mutedForeground }]}>
-              {online
-                ? `Balances synced${lastSyncedAt ? ` ${formatSyncedAt(lastSyncedAt)}` : ''}`
-                : lastSyncedAt
-                  ? `Last synced ${formatSyncedAt(lastSyncedAt)} · payments unavailable`
-                  : 'Balances may be out of date · payments unavailable'}
+              {demoMode
+                ? 'Local demo · balances stored on this device'
+                : online
+                  ? `Balances synced${lastSyncedAt ? ` ${formatSyncedAt(lastSyncedAt)}` : ''}`
+                  : lastSyncedAt
+                    ? `Last synced ${formatSyncedAt(lastSyncedAt)} · payments unavailable`
+                    : 'Balances may be out of date · payments unavailable'}
             </Text>
           </View>
           <HapticPressable onPress={toggleOnline} style={[styles.toggle, { backgroundColor: online ? colors.success : colors.border }]}>
