@@ -186,6 +186,8 @@ type ZxingModule = typeof import('@zxing/library');
 class WebQrDetector {
   private native: NativeBarcodeDetector | null = null;
   private nativeBroken = false;
+  private nativeMisses = 0;
+  private zxingFailures = 0;
   private zxing: ZxingModule | null = null;
   private zxingReader: InstanceType<ZxingModule['QRCodeReader']> | null = null;
   private zxingBroken = false;
@@ -200,9 +202,7 @@ class WebQrDetector {
           }
         ).BarcodeDetector;
         if (!Ctor) throw new Error('BarcodeDetector unavailable');
-        const detector = new Ctor({ formats: ['qr_code'] });
-        await detector.detect(video); // probe: some builds expose the class but cannot detect
-        this.native = detector;
+        this.native = new Ctor({ formats: ['qr_code'] });
       } catch {
         this.native = null;
         this.nativeBroken = true;
@@ -211,8 +211,14 @@ class WebQrDetector {
     if (this.native) {
       try {
         const results = await this.native.detect(video);
-        if (results.length > 0 && results[0].rawValue) return results[0].rawValue;
-        return null;
+        if (results.length > 0 && results[0].rawValue) {
+          this.nativeMisses = 0;
+          return results[0].rawValue;
+        }
+        // A native implementation can run without recognising the code.
+        // Give the independent decoder a frame about once per second too.
+        this.nativeMisses += 1;
+        if (this.nativeMisses % 3 !== 0) return null;
       } catch {
         this.native = null;
         this.nativeBroken = true;
@@ -241,7 +247,9 @@ class WebQrDetector {
       }
       const source = new z.RGBLuminanceSource(gray, width, height);
       const bitmap = new z.BinaryBitmap(new z.HybridBinarizer(source));
-      return this.zxingReader ? this.zxingReader.decode(bitmap).getText() : null;
+      const result = this.zxingReader ? this.zxingReader.decode(bitmap).getText() : null;
+      this.zxingFailures = 0;
+      return result;
     } catch (error) {
       if (!this.zxing) {
         // The fallback module itself failed to load: no detector remains.
@@ -254,8 +262,13 @@ class WebQrDetector {
         error instanceof z.FormatException ||
         error instanceof z.ChecksumException
       ) {
+        this.zxingFailures = 0;
         return null; // no decodable code in this frame
       }
+      // Unexpected failures are different from an ordinary frame without a
+      // QR. Stop silently retrying after three consecutive decoder failures.
+      this.zxingFailures += 1;
+      if (this.zxingFailures >= 3) this.zxingBroken = true;
       return null;
     }
   }
@@ -1746,6 +1759,7 @@ function ScanScreen({ onBack, onNavigate }: { onBack: () => void; onNavigate: (s
     setScanned(false);
     setScanError('');
     setCameraError(false);
+    webDetectorRef.current = null;
   };
 
   // Test-only scaffolding: ?scantest=<token> injects a scanned payload so the
